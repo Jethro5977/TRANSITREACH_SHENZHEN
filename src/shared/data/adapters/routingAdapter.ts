@@ -7,7 +7,7 @@
  */
 
 import polygonClipping, { type MultiPolygon, type Polygon as ClippingPolygon } from 'polygon-clipping';
-import { getIntersectingBarrierPolygons } from '../shenzhen/barriers';
+import { getIntersectingBarrierPolygons, preloadBarrierData } from '../shenzhen/barriers';
 import {
   getDepartureProfile,
   getWaitMinutes,
@@ -203,6 +203,10 @@ export async function computeReachability(
 ): Promise<ReachabilityComputation> {
   // Yield one frame so React can paint its computing state before synchronous geometry.
   await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
+  if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+  // The city-wide OSM snapshot is a one-time cold-start cost.  Initialise it before
+  // beginning the one-second computation budget so a first use is not treated as a timeout.
+  await preloadBarrierData();
   if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
   const startedAt = performance.now();
 

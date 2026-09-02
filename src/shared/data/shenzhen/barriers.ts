@@ -44,6 +44,14 @@ async function loadBarrierBounds(): Promise<BoundedBarrier[]> {
   return loadingBarriers;
 }
 
+/**
+ * Lazily initialise the bundled OSM snapshot before timing a route calculation.
+ * Network/cache initialisation is not part of the geometry algorithm budget.
+ */
+export async function preloadBarrierData(): Promise<void> {
+  await loadBarrierBounds();
+}
+
 /** Avoid sending the full city-wide snapshot to each Polygon difference operation. */
 export async function getIntersectingBarrierPolygons(bounds: {
   minLon: number;
