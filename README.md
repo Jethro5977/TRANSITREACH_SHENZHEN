@@ -2,6 +2,8 @@
 
 一个用于探索深圳步行与地铁组合可达范围的交互式 Web Demo。
 
+在线访问：[transitreach-sz.netlify.app](https://transitreach-sz.netlify.app/)
+
 ![TransitReach Shenzhen](https://img.shields.io/badge/City-Shenzhen-0d9488?style=flat-square)
 ![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square)
 ![Vite](https://img.shields.io/badge/Vite-5-646cff?style=flat-square)
