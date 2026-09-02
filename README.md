@@ -23,6 +23,8 @@
 - 通过独立 Info 弹窗公开展示数据来源、参数、覆盖范围和未建模限制
 - 支持 `/map`、`/methodology` 直达链接、中文 404 与 PWA 安装元数据
 - 地图页按需加载；站点按线路颜色显示，并在低缩放级别自动缩小以减少重叠
+- 低缩放级别将 266 个站点聚合为可点击数量标记；地图支持浅色 OSM 与可选 CARTO 暗色底图
+- 首页使用零依赖的数字跳动、CSS mesh 背景与轻量微倾斜；移动端地图配置自动切换为底部面板
 - 地图瓦片加载 skeleton、计算状态与模型边界说明
 
 ## 性能基线
@@ -95,3 +97,7 @@ npm run data:timetable
 - [Nominatim 使用政策](https://operations.osmfoundation.org/policies/nominatim/)
 - [OpenTripPlanner](https://github.com/opentripplanner/OpenTripPlanner)
 - [Valhalla](https://github.com/valhalla/valhalla)
+
+## UI 开源组件审计
+
+本次 UI 候选搜索、兼容性筛选、包体积取舍和实施优先级见 [UI_ENHANCEMENT_PLAN.md](UI_ENHANCEMENT_PLAN.md)。实际引入包及底图署名见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

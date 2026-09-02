@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
+import L from 'leaflet';
 import { MapContainer, TileLayer, CircleMarker, Polygon, Tooltip as LeafletTooltip, useMap, useMapEvents } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet/dist/leaflet.css';
+import 'react-leaflet-cluster/dist/assets/MarkerCluster.css';
 import type { IsochroneRegion } from '@/shared/data/adapters/routingAdapter';
 import type { LatLng, Origin } from '../types';
 import { NETWORK_CENTRE } from '../reachabilityService';
@@ -18,6 +21,8 @@ import { SHENZHEN_METRO_LINES, SHENZHEN_METRO_STOPS } from '@/shared/data/shenzh
  */
 const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+const DARK_TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const DARK_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
 const DEFAULT_ZOOM = 11;
 const ORIGIN_ZOOM = 15;
@@ -35,6 +40,16 @@ const FILL_OPACITY = 0.25;
 const AREA_COLOR = '#0d9488';
 const LINE_COLORS = new Map(SHENZHEN_METRO_LINES.map(line => [line.routeId, line.color]));
 
+/** A compact, teal cluster icon keeps 266 station markers readable at city scale. */
+function createClusterIcon(cluster: L.MarkerCluster) {
+  const count = cluster.getChildCount();
+  return L.divIcon({
+    html: `<span>${count}</span>`,
+    className: 'transit-station-cluster',
+    iconSize: L.point(36, 36, true),
+  });
+}
+
 function MetroStations() {
   const map = useMap();
   const [zoom, setZoom] = useState(map.getZoom());
@@ -42,7 +57,14 @@ function MetroStations() {
   const radius = zoom <= 11 ? 2.5 : zoom <= 13 ? 3.25 : 4;
 
   return (
-    <>
+    <MarkerClusterGroup
+      chunkedLoading
+      maxClusterRadius={44}
+      disableClusteringAtZoom={14}
+      spiderfyOnMaxZoom={false}
+      showCoverageOnHover={false}
+      iconCreateFunction={createClusterIcon}
+    >
       {SHENZHEN_METRO_STOPS.map(stop => (
         <CircleMarker
           key={stop.stopId}
@@ -61,7 +83,7 @@ function MetroStations() {
           </LeafletTooltip>
         </CircleMarker>
       ))}
-    </>
+    </MarkerClusterGroup>
   );
 }
 
@@ -70,6 +92,7 @@ interface BaseMapProps {
   /** Disjoint reachable regions, or null when there is nothing to draw. */
   regions: IsochroneRegion[] | null;
   onMapClick: (at: LatLng) => void;
+  theme: 'light' | 'dark';
 }
 
 /** Reports map clicks. AC 1.1.2 — a click sets or moves the single starting point. */
@@ -198,7 +221,7 @@ function ReachabilityLayer({ regions }: { regions: IsochroneRegion[] }) {
             ring.map(([lon, lat]) => [lat, lon] as [number, number]),
           )}
           pathOptions={{
-            className: 'reach-area',
+            className: 'reach-area reach-area-enter',
             color: AREA_COLOR,
             weight: 1.5,
             opacity: 0.55,
@@ -212,7 +235,7 @@ function ReachabilityLayer({ regions }: { regions: IsochroneRegion[] }) {
   );
 }
 
-export function BaseMap({ origin, regions, onMapClick }: BaseMapProps) {
+export function BaseMap({ origin, regions, onMapClick, theme }: BaseMapProps) {
   const [tilesReady, setTilesReady] = useState(false);
 
   useEffect(() => {
@@ -229,8 +252,9 @@ export function BaseMap({ origin, regions, onMapClick }: BaseMapProps) {
         zoomControl={false}
       >
         <TileLayer
-          url={OSM_TILE_URL}
-          attribution={OSM_ATTRIBUTION}
+          key={theme}
+          url={theme === 'dark' ? DARK_TILE_URL : OSM_TILE_URL}
+          attribution={theme === 'dark' ? DARK_ATTRIBUTION : OSM_ATTRIBUTION}
           maxZoom={19}
           eventHandlers={{ load: () => setTilesReady(true) }}
         />

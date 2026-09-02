@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Clock, Crosshair, Footprints, Info, Loader2, MapPin, Maximize2, Minimize2, RotateCw, TrainFront, X } from 'lucide-react';
+import { AlertTriangle, Clock, Crosshair, Footprints, Info, Loader2, MapPin, Maximize2, Minimize2, Moon, RotateCw, Sun, TrainFront, X } from 'lucide-react';
 import { Tooltip } from '@/shared/ui';
 import { BaseMap } from '@/features/reachability/components/BaseMap';
 import { DepartureTimeSelector } from '@/features/reachability/components/DepartureTimeSelector';
@@ -42,6 +42,7 @@ export function MapPage({ onToast }: MapPageProps) {
   const initialPlace = useMemo(() => initialLocation ? null : parsePlaceSearchParams(searchParams), [initialLocation, searchParams]);
   const [configOpen, setConfigOpen] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [mapTheme, setMapTheme] = useState<'light' | 'dark'>('light');
   const [nearbyPlace, setNearbyPlace] = useState<PlaceResult | null>(initialPlace);
   const reach = useReachability(initialLocation, initialPlace, onToast);
 
@@ -87,6 +88,7 @@ export function MapPage({ onToast }: MapPageProps) {
           origin={reach.origin}
           regions={reach.state.status === 'ready' ? reach.state.result.regions : null}
           onMapClick={selectPoint}
+          theme={mapTheme}
         />
       </div>
 
@@ -95,10 +97,17 @@ export function MapPage({ onToast }: MapPageProps) {
       {/* The budget composition note makes the panel tall enough to overflow a short
           viewport, so it scrolls internally rather than running off the bottom — the
           note has to stay reachable to satisfy AC 1.2.3. */}
-      <div className={`absolute top-4 left-4 sm:left-6 z-[500] max-h-[calc(100%-2rem)] transition-all duration-300 ease-out ${configOpen ? 'w-[340px] max-w-[calc(100vw-2rem)]' : 'w-12'}`}>
-        <div className="glass p-4 max-h-[calc(100vh-6rem)] overflow-y-auto overflow-x-hidden scrollbar-thin">
+      <div className={`map-config-panel absolute top-4 left-4 sm:left-6 z-[500] max-h-[calc(100%-2rem)] transition-all duration-300 ease-out ${configOpen ? 'w-[340px] max-w-[calc(100vw-2rem)]' : 'w-12'}`}>
+        <div className="map-config-card glass p-4 max-h-[calc(100vh-6rem)] overflow-y-auto overflow-x-hidden scrollbar-thin">
           <div className="flex items-center justify-between mb-3">
             {configOpen && <h2 className="text-sm font-bold text-slate-800 tracking-wide">深圳出发点</h2>}
+            {configOpen && (
+              <Tooltip content={mapTheme === 'light' ? '切换暗色底图' : '切换浅色底图'}>
+                <button onClick={() => setMapTheme(theme => theme === 'light' ? 'dark' : 'light')} className="btn-icon mr-1" style={{ width: 32, height: 32 }} aria-label={mapTheme === 'light' ? '切换暗色底图' : '切换浅色底图'}>
+                  {mapTheme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
+                </button>
+              </Tooltip>
+            )}
             <Tooltip content={configOpen ? '收起' : '展开'}>
               <button onClick={() => setConfigOpen(prev => !prev)} className="btn-icon ml-auto" style={{ width: 32, height: 32 }}>
                 {configOpen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}

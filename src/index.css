@@ -217,6 +217,23 @@
     transform: scale(0.92);
   }
 
+  /* Leaflet.markercluster visual adaptation: count markers stay part of the teal glass system. */
+  .transit-station-cluster {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 2px solid rgba(255, 255, 255, 0.95);
+    border-radius: 999px;
+    background: rgba(13, 148, 136, 0.92);
+    box-shadow: 0 5px 14px rgba(13, 148, 136, 0.32), 0 0 0 5px rgba(45, 212, 191, 0.16);
+    color: white;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
   /* Tooltip */
   .tooltip {
     position: absolute;
@@ -506,6 +523,38 @@
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-6px); }
   }
+
+  /* A slow, CSS-only mesh gives the landing page depth without a motion dependency. */
+  .hero-mesh {
+    background:
+      radial-gradient(circle at 18% 18%, rgba(20, 184, 166, 0.17), transparent 32%),
+      radial-gradient(circle at 84% 68%, rgba(37, 99, 235, 0.14), transparent 30%),
+      radial-gradient(circle at 50% 100%, rgba(45, 212, 191, 0.10), transparent 34%);
+    background-size: 130% 130%;
+    animation: meshDrift 16s ease-in-out infinite alternate;
+  }
+
+  @keyframes meshDrift {
+    from { background-position: 0% 0%, 100% 100%, 50% 100%; }
+    to { background-position: 10% 8%, 88% 86%, 55% 92%; }
+  }
+
+  .hero-snapshot {
+    transform: perspective(1100px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+    transform-style: preserve-3d;
+    transition: transform 180ms ease-out;
+    will-change: transform;
+  }
+
+  .reach-area-enter {
+    stroke-dasharray: 18 9;
+    animation: reachAreaReveal 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes reachAreaReveal {
+    from { opacity: 0; stroke-dashoffset: 90; fill-opacity: 0.02; }
+    to { opacity: 0.55; stroke-dashoffset: 0; fill-opacity: 0.25; }
+  }
 }
 
 @layer utilities {
@@ -555,7 +604,27 @@
     animation: none !important;
   }
 
-  .pulse-ring, .expand-ring, .float-soft {
+  .pulse-ring, .expand-ring, .float-soft, .hero-mesh, .reach-area-enter {
     animation: none !important;
+  }
+
+  .hero-snapshot { transform: none !important; }
+}
+
+@media (max-width: 639px) {
+  .map-config-panel {
+    top: auto;
+    right: 0.75rem;
+    bottom: 0;
+    left: 0.75rem;
+    width: auto !important;
+    max-width: none !important;
+    max-height: min(58vh, 520px);
+  }
+
+  .map-config-card {
+    max-height: min(58vh, 520px) !important;
+    border-radius: 22px 22px 0 0;
+    box-shadow: 0 -12px 34px rgba(11, 36, 59, 0.14);
   }
 }

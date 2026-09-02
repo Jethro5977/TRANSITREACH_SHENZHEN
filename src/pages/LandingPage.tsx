@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, type CSSProperties, type PointerEvent } from 'react';
 import { AlertTriangle, ArrowRight, Building2, Check, Clock3, Database, MapPin, Route, Sparkles, TrainFront, type LucideIcon } from 'lucide-react';
 import { LocationSearch, type LocationSearchResult } from '@/features/reachability/components/LocationSearch';
 import { isPlaceResult, type RailStop } from '@/features/reachability/types';
 import { SHENZHEN_DATA_SNAPSHOT_LABEL, SHENZHEN_METRO_LINES, SHENZHEN_METRO_STOPS } from '@/shared/data/shenzhen/metro';
 import { useNavigate } from 'react-router-dom';
+import { useCountUp, useScrollReveal } from '@/shared/hooks';
 const FEATURED_STATIONS = ['深圳北', '福田', '车公庙', '前海湾', '岗厦北', '老街'];
 
 export function LandingPage() {
   const [selected, setSelected] = useState<RailStop | null>(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const navigate = useNavigate();
 
   const chooseLocation = (result: LocationSearchResult) => {
@@ -23,7 +25,7 @@ export function LandingPage() {
   return (
     <main className="min-h-screen overflow-hidden">
       <section className="relative pt-28 pb-16 px-4 sm:px-6 lg:px-8">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_15%,rgba(20,184,166,0.14),transparent_34%),radial-gradient(circle_at_85%_70%,rgba(37,99,235,0.12),transparent_30%)]" />
+        <div className="hero-mesh absolute inset-0 -z-10" />
         <div className="max-w-[1320px] mx-auto grid lg:grid-cols-[1.05fr_0.95fr] gap-10 items-center">
           <div className="fade-slide-up">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-chip mb-6">
@@ -61,8 +63,22 @@ export function LandingPage() {
           </div>
 
           <div className="relative min-h-[430px] fade-slide-up">
-            <div className="absolute inset-0 rounded-[32px] bg-slate-950 shadow-2xl shadow-slate-900/20 overflow-hidden">
+            <div
+              className="hero-snapshot absolute inset-0 rounded-[32px] bg-slate-950 shadow-2xl shadow-slate-900/20 overflow-hidden"
+              style={{ '--tilt-x': `${tilt.x}deg`, '--tilt-y': `${tilt.y}deg` } as CSSProperties}
+              onPointerMove={(event: PointerEvent<HTMLDivElement>) => {
+                if (event.pointerType === 'touch') return;
+                const rect = event.currentTarget.getBoundingClientRect();
+                setTilt({ x: ((event.clientY - rect.top) / rect.height - 0.5) * -3, y: ((event.clientX - rect.left) / rect.width - 0.5) * 3 });
+              }}
+              onPointerLeave={() => setTilt({ x: 0, y: 0 })}
+            >
               <div className="absolute inset-0 opacity-30 bg-[linear-gradient(rgba(45,212,191,.16)_1px,transparent_1px),linear-gradient(90deg,rgba(45,212,191,.16)_1px,transparent_1px)] bg-[size:40px_40px]" />
+              <svg className="absolute inset-0 h-full w-full opacity-70" viewBox="0 0 600 430" aria-hidden="true">
+                <path d="M65 290 C145 190 185 318 252 235 S354 146 420 215 S520 154 555 91" fill="none" stroke="rgba(45,212,191,.8)" strokeWidth="2" className="draw-route" />
+                <path d="M100 114 C185 160 200 81 282 132 S394 290 516 314" fill="none" stroke="rgba(96,165,250,.72)" strokeWidth="2" strokeDasharray="7 7" className="draw-route" />
+                <circle cx="252" cy="235" r="4" fill="#5eead4" /><circle cx="420" cy="215" r="4" fill="#5eead4" /><circle cx="516" cy="314" r="4" fill="#93c5fd" />
+              </svg>
               <div
                 className="absolute w-72 h-72 border border-teal-300/30 bg-teal-400/10 left-[14%] top-[17%]"
                 style={{ clipPath: 'polygon(12% 18%, 34% 5%, 61% 9%, 86% 26%, 95% 53%, 83% 78%, 58% 94%, 30% 88%, 8% 66%, 3% 39%)' }}
@@ -77,9 +93,9 @@ export function LandingPage() {
                 <div className="text-2xl font-bold mt-2">30 分钟可达性快照</div>
               </div>
               <div className="absolute left-7 right-7 bottom-7 grid grid-cols-3 gap-3">
-                <Metric label="覆盖站点" value={`${SHENZHEN_METRO_STOPS.length}`} />
-                <Metric label="覆盖线路" value={`${SHENZHEN_METRO_LINES.length}`} />
-                <Metric label="默认预算" value="30 min" />
+                <Metric label="覆盖站点" value={SHENZHEN_METRO_STOPS.length} />
+                <Metric label="覆盖线路" value={SHENZHEN_METRO_LINES.length} delay={90} />
+                <Metric label="默认预算" value={30} suffix=" min" delay={180} />
               </div>
             </div>
           </div>
@@ -117,11 +133,13 @@ export function LandingPage() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, suffix = '', delay = 0 }: { label: string; value: number; suffix?: string; delay?: number }) {
+  const { ref, visible } = useScrollReveal<HTMLDivElement>();
+  const displayed = useCountUp(visible ? value : 0, 760, delay);
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur px-4 py-3 text-white">
+    <div ref={ref} className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur px-4 py-3 text-white">
       <div className="text-[10px] uppercase tracking-wider text-slate-400">{label}</div>
-      <div className="font-bold text-xl mt-1">{value}</div>
+      <div className="font-bold text-xl mt-1">{Math.round(displayed)}{suffix}</div>
     </div>
   );
 }
