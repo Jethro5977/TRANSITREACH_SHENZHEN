@@ -32,21 +32,28 @@ const ORIGIN_ZOOM = 15;
  *
  * AC 1.3.1's checkable requirement is that "street names and base map features remain
  * readable through it". The epic proposed 40% and left the value for the team to confirm;
- * the team settled on 25%, because 40% teal over OSM raster tiles buries small street
- * labels while 25% leaves them legible at every zoom. This value is now agreed, not
- * provisional.
+ * the team settled on a restrained 20%, because stronger teal over raster tiles buries
+ * small street labels. The thin dashed edge preserves the boundary without masking the
+ * basemap underneath.
  */
-const FILL_OPACITY = 0.25;
+const FILL_OPACITY = 0.2;
 const AREA_COLOR = '#0d9488';
 const LINE_COLORS = new Map(SHENZHEN_METRO_LINES.map(line => [line.routeId, line.color]));
 
-/** A compact, teal cluster icon keeps 266 station markers readable at city scale. */
+/**
+ * Cluster count is part of the visual hierarchy: a group of three must not occupy
+ * the same screen area as a dense interchange corridor. The CSS classes own the
+ * rendered diameter while Leaflet receives a slightly larger hit box.
+ */
 function createClusterIcon(cluster: L.MarkerCluster) {
   const count = cluster.getChildCount();
+  const size = count <= 3 ? 24 : count <= 8 ? 30 : 36;
+  const sizeClass = count <= 3 ? 'cluster-sm' : count <= 8 ? 'cluster-md' : 'cluster-lg';
+
   return L.divIcon({
     html: `<span>${count}</span>`,
-    className: 'transit-station-cluster',
-    iconSize: L.point(36, 36, true),
+    className: `transit-station-cluster ${sizeClass}`,
+    iconSize: L.point(size, size, true),
   });
 }
 
@@ -59,30 +66,35 @@ function MetroStations() {
   return (
     <MarkerClusterGroup
       chunkedLoading
-      maxClusterRadius={44}
-      disableClusteringAtZoom={14}
+      maxClusterRadius={28}
+      disableClusteringAtZoom={13}
       spiderfyOnMaxZoom={false}
       showCoverageOnHover={false}
       iconCreateFunction={createClusterIcon}
+      animate
+      animateAddingMarkers={false}
     >
-      {SHENZHEN_METRO_STOPS.map(stop => (
-        <CircleMarker
-          key={stop.stopId}
-          center={[stop.lat, stop.lon]}
-          radius={radius}
-          pathOptions={{
-            color: '#ffffff',
-            weight: stop.lines.length > 1 ? 1.8 : 1.1,
-            fillColor: LINE_COLORS.get(stop.lines[0]) ?? '#0d9488',
-            fillOpacity: zoom <= 11 ? 0.76 : 0.92,
-          }}
-        >
-          <LeafletTooltip direction="top" offset={[0, -5]}>
-            <span className="font-semibold">{stop.name}</span>
-            <span className="text-slate-500"> · {stop.lines.join('/')}号线</span>
-          </LeafletTooltip>
-        </CircleMarker>
-      ))}
+      {SHENZHEN_METRO_STOPS.map(stop => {
+        const isInterchange = stop.lines.length > 1;
+        return (
+          <CircleMarker
+            key={stop.stopId}
+            center={[stop.lat, stop.lon]}
+            radius={radius}
+            pathOptions={{
+              color: isInterchange ? '#0f766e' : '#ffffff',
+              weight: isInterchange ? 2.2 : 1.1,
+              fillColor: isInterchange ? '#ffffff' : (LINE_COLORS.get(stop.lines[0]) ?? '#0d9488'),
+              fillOpacity: isInterchange ? 1 : (zoom <= 11 ? 0.76 : 0.92),
+            }}
+          >
+            <LeafletTooltip direction="top" offset={[0, -5]}>
+              <span className="font-semibold">{stop.name}</span>
+              <span className="text-slate-500"> · {stop.lines.join('/')}号线</span>
+            </LeafletTooltip>
+          </CircleMarker>
+        );
+      })}
     </MarkerClusterGroup>
   );
 }
@@ -223,10 +235,11 @@ function ReachabilityLayer({ regions }: { regions: IsochroneRegion[] }) {
           pathOptions={{
             className: 'reach-area reach-area-enter',
             color: AREA_COLOR,
-            weight: 1.5,
-            opacity: 0.55,
+            weight: 2,
+            opacity: 0.6,
             fillColor: AREA_COLOR,
             fillOpacity: FILL_OPACITY,
+            dashArray: '6 3',
           }}
           interactive={false}
         />
