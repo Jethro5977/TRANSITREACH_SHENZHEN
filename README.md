@@ -4,6 +4,8 @@
 
 在线访问：[transitreach-sz.netlify.app](https://transitreach-sz.netlify.app/)
 
+`main` 分支已连接 Netlify；推送更新后会自动执行 `npm run build` 并发布 `dist/`。
+
 ![TransitReach Shenzhen](https://img.shields.io/badge/City-Shenzhen-0d9488?style=flat-square)
 ![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square)
 ![Vite](https://img.shields.io/badge/Vite-5-646cff?style=flat-square)
