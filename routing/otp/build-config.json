@@ -1,0 +1,19 @@
+{
+  "transitServiceStart": "-P1M",
+  "transitServiceEnd": "P1Y",
+
+  "osm": [
+    {
+      "source": "malaysia-singapore-brunei-latest.osm.pbf",
+      "osmTagMapping": "default"
+    }
+  ],
+
+  "transitFeeds": [
+    {
+      "type": "gtfs",
+      "source": "gtfs-rapid-rail-kl-expanded",
+      "feedId": "prasarana-rapid-rail-kl"
+    }
+  ]
+}

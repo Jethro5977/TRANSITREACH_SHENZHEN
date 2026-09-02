@@ -1,0 +1,237 @@
+{
+  "generatedAt": "2026-08-30T08:41:54.243Z",
+  "feeds": [
+    {
+      "feedId": "prasarana-rapid-rail-kl",
+      "feedName": "Prasarana Rapid Rail KL",
+      "agency": "rapidrail",
+      "source": "https://api.data.gov.my/gtfs-static/prasarana?category=rapid-rail-kl",
+      "licence": null,
+      "licenceStatus": "not yet confirmed — record in the Project Governance Portfolio data table",
+      "serviceDateRange": {
+        "start": "20190101",
+        "end": "20261231"
+      },
+      "serviceCalendars": [
+        {
+          "serviceId": "Sun",
+          "days": [
+            "sunday"
+          ],
+          "startDate": "20190101",
+          "endDate": "20261231",
+          "referencedByTrips": true,
+          "expired": false
+        },
+        {
+          "serviceId": "Sat",
+          "days": [
+            "saturday"
+          ],
+          "startDate": "20190101",
+          "endDate": "20261231",
+          "referencedByTrips": true,
+          "expired": false
+        },
+        {
+          "serviceId": "SatSun",
+          "days": [
+            "saturday",
+            "sunday"
+          ],
+          "startDate": "20190101",
+          "endDate": "20261231",
+          "referencedByTrips": false,
+          "expired": false
+        },
+        {
+          "serviceId": "MonThu",
+          "days": [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday"
+          ],
+          "startDate": "20190101",
+          "endDate": "20261231",
+          "referencedByTrips": false,
+          "expired": false
+        },
+        {
+          "serviceId": "Fri",
+          "days": [
+            "friday"
+          ],
+          "startDate": "20190101",
+          "endDate": "20261231",
+          "referencedByTrips": false,
+          "expired": false
+        },
+        {
+          "serviceId": "MonFri",
+          "days": [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday"
+          ],
+          "startDate": "20190101",
+          "endDate": "20261231",
+          "referencedByTrips": true,
+          "expired": false
+        },
+        {
+          "serviceId": "weekday",
+          "days": [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday"
+          ],
+          "startDate": "20200401",
+          "endDate": "20260331",
+          "referencedByTrips": false,
+          "expired": true
+        },
+        {
+          "serviceId": "weekend",
+          "days": [
+            "saturday",
+            "sunday"
+          ],
+          "startDate": "20200401",
+          "endDate": "20260331",
+          "referencedByTrips": false,
+          "expired": true
+        }
+      ],
+      "lines": [
+        {
+          "routeId": "AG",
+          "shortName": "AGL",
+          "longName": "LRT Ampang Line",
+          "mode": "LRT",
+          "color": "#e57200",
+          "stopCount": 18
+        },
+        {
+          "routeId": "KJ",
+          "shortName": "KJL",
+          "longName": "LRT Kelana Jaya Line",
+          "mode": "LRT",
+          "color": "#D50032",
+          "stopCount": 37
+        },
+        {
+          "routeId": "PH",
+          "shortName": "SPL",
+          "longName": "LRT Sri Petaling Line",
+          "mode": "LRT",
+          "color": "#76232f",
+          "stopCount": 29
+        },
+        {
+          "routeId": "KGL",
+          "shortName": "KGL",
+          "longName": "MRT Kajang Line",
+          "mode": "MRT",
+          "color": "#047940",
+          "stopCount": 29
+        },
+        {
+          "routeId": "PYL",
+          "shortName": "PYL",
+          "longName": "MRT Putrajaya Line",
+          "mode": "MRT",
+          "color": "#FFCD00",
+          "stopCount": 36
+        },
+        {
+          "routeId": "MR",
+          "shortName": "MRL",
+          "longName": "KL Monorail Line",
+          "mode": "MRL",
+          "color": "#84bd00",
+          "stopCount": 11
+        },
+        {
+          "routeId": "BRT",
+          "shortName": "BRT",
+          "longName": "BRT Sunway Line",
+          "mode": "BRT",
+          "color": "#115740",
+          "stopCount": 7
+        },
+        {
+          "routeId": "SA",
+          "shortName": "SAL",
+          "longName": "LRT Shah Alam Line",
+          "mode": "LRT",
+          "color": "#00A9E0",
+          "stopCount": 20
+        }
+      ]
+    }
+  ],
+  "epicLineCoverage": [
+    {
+      "label": "LRT Kelana Jaya",
+      "routeId": "KJ",
+      "present": true
+    },
+    {
+      "label": "LRT Ampang",
+      "routeId": "AG",
+      "present": true
+    },
+    {
+      "label": "LRT Sri Petaling",
+      "routeId": "PH",
+      "present": true
+    },
+    {
+      "label": "LRT Shah Alam (LRT3)",
+      "routeId": "SA",
+      "present": true
+    },
+    {
+      "label": "MRT Kajang",
+      "routeId": "KGL",
+      "present": true
+    },
+    {
+      "label": "MRT Putrajaya",
+      "routeId": "PYL",
+      "present": true
+    },
+    {
+      "label": "KL Monorail",
+      "routeId": "MR",
+      "present": true
+    },
+    {
+      "label": "BRT Sunway",
+      "routeId": "BRT",
+      "present": true
+    }
+  ],
+  "modesNotLoaded": [
+    "Bus services are not included in this result.",
+    "Feeder bus services are not included in this result."
+  ],
+  "studyAreaFeedExtent": {
+    "minLat": 2.9313,
+    "maxLat": 3.231793,
+    "minLon": 101.440556,
+    "maxLon": 101.790278
+  },
+  "notes": [
+    "stops.txt carries a \"geometry\" column serialised as \"[object Object]\". It is never read; all positions come from stop_lat / stop_lon.",
+    "calendar.txt contains expired service periods (weekday, weekend), but no trip references them, so no computation can draw on them.",
+    "stops.txt uses route_id \"MRT\" where routes.txt uses \"KGL\"",
+    "20 stations merge multiple platform rows (one per line) into a single searchable entry. Position is the mean of the merged platform coordinates; members are listed in \"platforms\"."
+  ],
+  "warnings": []
+}

@@ -1,0 +1,18 @@
+[Unit]
+Description=OpenTripPlanner routing engine (TransitReach)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/opt/otp
+# -Xmx3G leaves headroom on a 4 GB instance. Measured working set is ~1.8-2.2 GB.
+ExecStart=/usr/bin/java -Xmx3G -jar /opt/otp/otp-2.5.0-shaded.jar --load /opt/otp
+Restart=always
+RestartSec=10
+# The graph takes ~25s to deserialise; do not let systemd give up early.
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
