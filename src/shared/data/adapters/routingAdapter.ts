@@ -1,9 +1,9 @@
 /**
  * Local Shenzhen reachability estimator used by the China demo branch.
  *
- * This deliberately does not call the Kuala Lumpur OTP service. It combines a walking
- * catchment with small egress catchments around stations reachable on the same sampled
- * metro corridor. It is useful for product interaction testing, not journey planning.
+ * This pure-front-end Shenzhen Demo combines a walking catchment with egress catchments
+ * around stations reachable directly or with at most one sampled-line transfer.
+ * It is useful for product interaction testing, not journey planning.
  */
 
 import { loadRailStops } from './gtfsAdapter';
@@ -52,6 +52,7 @@ interface CircleCatchment {
 const WALK_KMH = WALK_SPEED_MS * 3.6;
 const METRO_KMH = 34;
 const WAIT_MINUTES = 4;
+const TRANSFER_MINUTES = 4;
 const MAX_ACCESS_KM = 1.35;
 const MAX_EGRESS_KM = 1.2;
 const EARTH_KM_PER_DEG_LAT = 110.574;
@@ -136,10 +137,30 @@ export async function computeReachability(
 
   for (const access of accessStops) {
     const accessMinutes = (access.distance / WALK_KMH) * 60;
+    const journeyMinutes = new Map<string, number>();
+
+    for (const destination of stops) {
+      if (!access.stop.lines.some(line => destination.lines.includes(line))) continue;
+      journeyMinutes.set(destination.stopId, WAIT_MINUTES + (distanceKm(access.stop, destination) / METRO_KMH) * 60);
+    }
+
+    for (const interchange of stops) {
+      const firstLines = access.stop.lines.filter(line => interchange.lines.includes(line));
+      if (firstLines.length === 0 || interchange.lines.length < 2) continue;
+      const firstLegMinutes = WAIT_MINUTES + (distanceKm(access.stop, interchange) / METRO_KMH) * 60;
+      const onwardLines = interchange.lines.filter(line => !firstLines.includes(line));
+      for (const destination of stops) {
+        if (!destination.lines.some(line => onwardLines.includes(line))) continue;
+        const total = firstLegMinutes + TRANSFER_MINUTES + (distanceKm(interchange, destination) / METRO_KMH) * 60;
+        const previous = journeyMinutes.get(destination.stopId);
+        if (previous === undefined || total < previous) journeyMinutes.set(destination.stopId, total);
+      }
+    }
+
     for (const stop of stops) {
-      if (!access.stop.lines.some(line => stop.lines.includes(line))) continue;
-      const metroMinutes = (distanceKm(access.stop, stop) / METRO_KMH) * 60;
-      const remaining = budgetMinutes - accessMinutes - WAIT_MINUTES - metroMinutes;
+      const metroMinutes = journeyMinutes.get(stop.stopId);
+      if (metroMinutes === undefined) continue;
+      const remaining = budgetMinutes - accessMinutes - metroMinutes;
       if (remaining < 2) continue;
       const radiusKm = Math.min(MAX_EGRESS_KM, (remaining / 60) * WALK_KMH);
       circles.push({ lat: stop.lat, lon: stop.lon, radiusKm });

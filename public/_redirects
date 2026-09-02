@@ -1,16 +1,2 @@
-# Proxy routing requests to the OpenTripPlanner instance (Monash / ARDC Nectar).
-#
-# This MUST stay above the SPA catch-all below. If /* comes first it swallows /otp/*,
-# and every routing request returns index.html instead of a result — which looks exactly
-# like the routing server being down.
-#
-# The 200 status makes this a proxy rather than a redirect: Netlify fetches the routing
-# service server-side and returns the result as if it came from this domain. That is what
-# lets an HTTPS page reach an HTTP routing service without the browser blocking it as
-# mixed content.
-#
-# If the routing server moves, change the address here and redeploy. No code change.
-/otp/*    http://203.101.230.213:8080/otp/:splat    200
-
-# SPA fallback — must remain last.
-/*        /index.html                               200
+# React Router SPA fallback for direct navigation and refreshes.
+/*  /index.html  200

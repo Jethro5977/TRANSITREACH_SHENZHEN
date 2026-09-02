@@ -17,15 +17,29 @@ import {
   getDataBasis,
 } from '@/features/reachability/reachabilityService';
 import { linesForStop } from '@/shared/data/adapters/gtfsAdapter';
+import { loadRailStops } from '@/shared/data/adapters/gtfsAdapter';
+import { useSearchParams } from 'react-router-dom';
 
 interface MapPageProps {
-  initialLocation: RailStop | null;
   onToast: (message: string, icon?: string) => void;
 }
 
-export function MapPage({ initialLocation, onToast }: MapPageProps) {
+export function MapPage({ onToast }: MapPageProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const stopId = searchParams.get('stop');
+  const initialLocation = loadRailStops().find(stop => stop.stopId === stopId) ?? null;
   const [configOpen, setConfigOpen] = useState(true);
   const reach = useReachability(initialLocation, onToast);
+
+  const selectStop = (stop: RailStop) => {
+    reach.selectStop(stop);
+    setSearchParams({ stop: stop.stopId }, { replace: true });
+  };
+
+  const selectPoint = (at: { lat: number; lon: number }) => {
+    reach.selectPoint(at);
+    setSearchParams({}, { replace: true });
+  };
 
   return (
     // top-16 rather than pt-16: an absolutely positioned child resolves inset-0 against
@@ -35,7 +49,7 @@ export function MapPage({ initialLocation, onToast }: MapPageProps) {
         <BaseMap
           origin={reach.origin}
           regions={reach.state.status === 'ready' ? reach.state.result.regions : null}
-          onMapClick={reach.selectPoint}
+          onMapClick={selectPoint}
         />
       </div>
 
@@ -58,7 +72,7 @@ export function MapPage({ initialLocation, onToast }: MapPageProps) {
           {configOpen && (
             <div className="space-y-4 fade-in">
               <LocationSearch
-                onSelect={reach.selectStop}
+                onSelect={selectStop}
                 selected={reach.origin?.stop ?? null}
                 compact
               />
@@ -291,7 +305,7 @@ function DataBasisNote() {
       <div className="mt-2 space-y-1 text-[11px] leading-snug">
         <div>
           <span className="font-semibold text-slate-700">{basis.feedName}</span>
-          <span className="text-slate-500"> — 精选 {basis.lineCount} 条线路的站点样本</span>
+          <span className="text-slate-500"> — {basis.lineCount} 条线路的静态站点快照</span>
         </div>
         <div className="text-slate-600">
           出发假设：{basis.dayLabel}
@@ -411,7 +425,7 @@ function CoveredAreaNote() {
   return (
     <p className="text-[11px] text-slate-500 leading-relaxed">
       <span className="font-semibold text-slate-600">可选范围：</span>
-      深圳市域 Demo 边界（站点数据范围外扩 {STUDY_AREA_BUFFER_KM} km）。公交、实时班次及真实步行路网尚未接入。
+      深圳市域 Demo 边界（按静态站点数据范围，外扩 {STUDY_AREA_BUFFER_KM} km）。公交、实时班次及真实步行路网尚未接入。
     </p>
   );
 }

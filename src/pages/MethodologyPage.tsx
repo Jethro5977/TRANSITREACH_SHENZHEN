@@ -1,9 +1,9 @@
 import { AlertTriangle, Clock3, Database, Footprints, MapPinned, TrainFront } from 'lucide-react';
 
 const STEPS = [
-  { icon: MapPinned, title: '1. 选择深圳起点', text: '从精选地铁站中搜索，或点击地图任意深圳市域坐标。' },
+  { icon: MapPinned, title: '1. 选择深圳起点', text: '从静态地铁站快照中搜索，或点击地图任意深圳市域坐标。' },
   { icon: Footprints, title: '2. 估算首段步行', text: '以 4.8 km/h、最长 1.35 km 的直线接驳寻找附近站点。' },
-  { icon: TrainFront, title: '3. 沿地铁走廊扩展', text: '同一抽样线路按平均 34 km/h 估算车内时间，另计 4 分钟候车。' },
+  { icon: TrainFront, title: '3. 沿地铁走廊扩展', text: '按平均 34 km/h 估算车内时间，另计 4 分钟候车，并允许一次固定 4 分钟的换乘。' },
   { icon: Clock3, title: '4. 分配剩余时间', text: '把剩余时间转换为各下车站周围的步行圈，单站半径最多 1.2 km。' },
 ];
 
@@ -35,9 +35,9 @@ export function MethodologyPage() {
             <h2 className="font-bold text-slate-900">本地 Demo 使用的数据</h2>
           </div>
           <ul className="space-y-3 text-sm text-slate-600 leading-relaxed">
-            <li><strong className="text-slate-800">底图与站点坐标：</strong>OpenStreetMap / Overpass，2026-09-02 获取的精选深圳地铁站快照，遵循 ODbL 并在地图持续署名。</li>
+            <li><strong className="text-slate-800">底图与站点坐标：</strong>OpenStreetMap / Overpass，2026-09-02 获取并去重的 266 站静态快照，遵循 ODbL 并在地图持续署名。</li>
             <li><strong className="text-slate-800">线路名称：</strong>以深圳市交通运输局与深圳地铁公开线路信息校对。</li>
-            <li><strong className="text-slate-800">模型参数：</strong>步行 4.8 km/h、地铁平均 34 km/h、候车 4 分钟，均为交互原型假设，不是运营方发布指标。</li>
+            <li><strong className="text-slate-800">模型参数：</strong>步行 4.8 km/h、地铁平均 34 km/h、候车 4 分钟、一次换乘 4 分钟，均为交互原型假设，不是运营方发布指标。</li>
           </ul>
         </section>
 

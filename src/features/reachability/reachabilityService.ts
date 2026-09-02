@@ -95,14 +95,9 @@ export const WALK_SPEED_KMH = Math.round(WALK_SPEED_MS * 3.6 * 10) / 10;
  */
 export const MODES_NOT_LOADED = '本 Demo 未加载公交、实时班次、拥堵和步行路网。';
 
-/**
- * AC 1.3.3 — the result is scheduled, not live. There is no realtime feed for rail in any
- * case: the Prasarana vehicle-position endpoint returns 404 for rapid-rail-kl, and the bus
- * feeds that do exist publish vehicle positions only, never trip updates, so they could not
- * shift a travel time even once loaded.
- */
+/** AC 1.3.3 — the static OSM snapshot and local estimator contain no realtime feed. */
 export const REALTIME_NOTE =
-  '本地结果由精选地铁站坐标和启发式速度模型生成，不反映当前运营、施工、拥堵或临时封站情况。';
+  '本地结果由静态地铁站快照和启发式速度模型生成，不反映当前运营、施工、拥堵或临时封站情况。';
 
 // ---------------------------------------------------------------- data basis
 
@@ -200,13 +195,13 @@ export const BUDGET_COMPONENTS: BudgetComponent[] = [
     label: '地铁车内时间',
     modelled: true,
     estimate: true,
-    status: '同一抽样线路上的站点按平均 34 km/h 估算。',
+    status: '抽样线路上的站间距离按平均 34 km/h 估算。',
   },
   {
     label: '换乘时间',
     estimate: true,
-    modelled: false,
-    status: '当前不计算跨线换乘；正式版需接入完整网络拓扑与时刻表。',
+    modelled: true,
+    status: '最多模拟一次跨线换乘，统一计入 4 分钟；并非真实站内步行或候车时间。',
   },
   {
     label: '出站后步行',
@@ -232,7 +227,7 @@ export const BUDGET_ASSUMPTIONS = [
   },
   {
     label: '交通方式',
-    status: `精选地铁站 + 步行估算。${MODES_NOT_LOADED}`,
+    status: `静态地铁站快照 + 步行估算。${MODES_NOT_LOADED}`,
   },
 ];
 

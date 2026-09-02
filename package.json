@@ -1,22 +1,24 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "transitreach-shenzhen",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.2.0",
+  "description": "深圳公共交通时间可达性前端演示",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "data:metro": "node scripts/build-shenzhen-metro.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.4",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.446.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-leaflet": "^4.2.1"
+    "react-leaflet": "^4.2.1",
+    "react-router-dom": "^7.18.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",

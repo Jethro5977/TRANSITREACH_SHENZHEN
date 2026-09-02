@@ -2,7 +2,7 @@ import type { MapPoint, RoadSegment } from '@/shared/types/location';
 
 export const MAP_W = 1000;
 export const MAP_H = 700;
-export const CITY_CENTER: MapPoint = { x: 500, y: 360 };
+export const CITY_CENTER: MapPoint = { x: 784, y: 400 };
 
 export const RIVER_PATH: MapPoint[] = [
   { x: -20, y: 120 }, { x: 180, y: 160 }, { x: 320, y: 140 }, { x: 420, y: 200 },

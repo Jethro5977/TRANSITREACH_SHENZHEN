@@ -1,7 +1,6 @@
 export * from './useCountUp';
 export * from './usePrefersReducedMotion';
 export * from './useScrollReveal';
-export * from './useStaggeredReveal';
 export * from './useAnimatedWidth';
 export * from './useScrollPosition';
 export * from './usePrevious';

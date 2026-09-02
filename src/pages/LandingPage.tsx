@@ -1,22 +1,17 @@
 import { useState } from 'react';
 import { ArrowRight, Building2, Clock3, Database, MapPin, Route, Sparkles, TrainFront } from 'lucide-react';
 import { LocationSearch, type RailStop } from '@/features/reachability';
-import type { PageId } from '@/app/routes';
-import { SHENZHEN_METRO_STOPS } from '@/shared/data/shenzhen/metro';
+import { SHENZHEN_METRO_LINES, SHENZHEN_METRO_STOPS } from '@/shared/data/shenzhen/metro';
+import { useNavigate } from 'react-router-dom';
+const FEATURED_STATIONS = ['深圳北', '福田', '车公庙', '前海湾', '岗厦北', '老街'];
 
-interface LandingPageProps {
-  onNavigate: (page: PageId) => void;
-  onSearchSelect: (stop: RailStop) => void;
-}
-const FEATURED_STATIONS = ['深圳北站', '福田', '车公庙', '前海湾', '岗厦北', '老街'];
-
-export function LandingPage({ onNavigate, onSearchSelect }: LandingPageProps) {
+export function LandingPage() {
   const [selected, setSelected] = useState<RailStop | null>(null);
+  const navigate = useNavigate();
 
   const chooseStop = (stop: RailStop) => {
     setSelected(stop);
-    onSearchSelect(stop);
-    onNavigate('map');
+    navigate(`/map?stop=${encodeURIComponent(stop.stopId)}`);
   };
 
   return (
@@ -50,10 +45,10 @@ export function LandingPage({ onNavigate, onSearchSelect }: LandingPageProps) {
               })}
             </div>
             <div className="flex flex-wrap gap-3">
-              <button onClick={() => onNavigate('map')} className="btn-primary inline-flex items-center gap-2">
+              <button onClick={() => navigate('/map')} className="btn-primary inline-flex items-center gap-2">
                 打开深圳地图 <ArrowRight size={18} />
               </button>
-              <button onClick={() => onNavigate('methodology')} className="btn-secondary inline-flex items-center gap-2">
+              <button onClick={() => navigate('/methodology')} className="btn-secondary inline-flex items-center gap-2">
                 <Route size={17} /> 查看模型说明
               </button>
             </div>
@@ -71,7 +66,7 @@ export function LandingPage({ onNavigate, onSearchSelect }: LandingPageProps) {
               </div>
               <div className="absolute left-7 right-7 bottom-7 grid grid-cols-3 gap-3">
                 <Metric label="站点样本" value={`${SHENZHEN_METRO_STOPS.length}`} />
-                <Metric label="线路样本" value="11" />
+                <Metric label="线路样本" value={`${SHENZHEN_METRO_LINES.length}`} />
                 <Metric label="默认预算" value="30 min" />
               </div>
             </div>
@@ -84,14 +79,14 @@ export function LandingPage({ onNavigate, onSearchSelect }: LandingPageProps) {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <InfoCard icon={MapPin} title="地图自由选点" text="站点搜索或地图点击均可设为起点。" />
             <InfoCard icon={Clock3} title="四档时间预算" text="快速对比 15、30、45、60 分钟范围。" />
-            <InfoCard icon={TrainFront} title="深圳轨道样本" text="覆盖主要走廊与换乘枢纽的精选站点。" />
+            <InfoCard icon={TrainFront} title="深圳轨道快照" text="包含 266 个 OSM 去重站点与 11 条线路关系。" />
             <InfoCard icon={Database} title="来源透明" text="开放地图坐标与 Demo 假设在结果旁说明。" />
           </div>
           <div className="mt-6 glass p-5 flex gap-3 items-start border border-amber-200/70">
             <Building2 size={19} className="text-amber-600 mt-0.5 shrink-0" />
             <p className="text-sm text-slate-600 leading-relaxed">
               <strong className="text-slate-800">本页面是本地产品 Demo。</strong>
-              当前范围使用启发式速度模型，不含完整时刻表、换乘耗时、道路步行网络或实时运营信息，不可用于实际导航。
+              当前范围使用启发式速度模型，最多模拟一次换乘；不含完整时刻表、道路步行网络或实时运营信息，不可用于实际导航。
             </p>
           </div>
         </div>
