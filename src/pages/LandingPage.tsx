@@ -58,8 +58,14 @@ export function LandingPage() {
           <div className="relative min-h-[430px] fade-slide-up">
             <div className="absolute inset-0 rounded-[32px] bg-slate-950 shadow-2xl shadow-slate-900/20 overflow-hidden">
               <div className="absolute inset-0 opacity-30 bg-[linear-gradient(rgba(45,212,191,.16)_1px,transparent_1px),linear-gradient(90deg,rgba(45,212,191,.16)_1px,transparent_1px)] bg-[size:40px_40px]" />
-              <div className="absolute w-72 h-72 rounded-full border border-teal-300/30 bg-teal-400/10 left-[14%] top-[17%]" />
-              <div className="absolute w-44 h-44 rounded-full border border-blue-300/30 bg-blue-400/10 right-[10%] bottom-[12%]" />
+              <div
+                className="absolute w-72 h-72 border border-teal-300/30 bg-teal-400/10 left-[14%] top-[17%]"
+                style={{ clipPath: 'polygon(12% 18%, 34% 5%, 61% 9%, 86% 26%, 95% 53%, 83% 78%, 58% 94%, 30% 88%, 8% 66%, 3% 39%)' }}
+              />
+              <div
+                className="absolute w-44 h-44 border border-blue-300/30 bg-blue-400/10 right-[10%] bottom-[12%]"
+                style={{ clipPath: 'polygon(16% 10%, 55% 4%, 88% 25%, 97% 62%, 72% 94%, 31% 89%, 5% 58%)' }}
+              />
               <div className="absolute left-[36%] top-[43%] w-5 h-5 rounded-full bg-teal-400 ring-[12px] ring-teal-400/20 shadow-[0_0_35px_rgba(45,212,191,.9)]" />
               <div className="absolute left-7 top-7 text-white">
                 <div className="text-xs text-teal-300 font-bold tracking-[0.2em]">TRANSITREACH SHENZHEN</div>
@@ -79,7 +85,7 @@ export function LandingPage() {
         <div className="max-w-[1320px] mx-auto">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <InfoCard icon={MapPin} title="地图自由选点" text="站点搜索或地图点击均可设为起点。" />
-            <InfoCard icon={Clock3} title="四档时间预算" text="快速对比 15、30、45、60 分钟范围。" />
+            <InfoCard icon={Clock3} title="不规则区域边界" text="合并重叠站点包络，保留分离区域与内部空洞。" />
             <InfoCard icon={TrainFront} title="深圳轨道快照" text="包含 266 个 OSM 去重站点与 11 条线路关系。" />
             <InfoCard icon={Database} title="来源透明" text={`开放地图坐标与模型假设持续说明 · 数据快照 ${SHENZHEN_DATA_SNAPSHOT_LABEL}。`} />
           </div>
@@ -87,7 +93,7 @@ export function LandingPage() {
             <Building2 size={19} className="text-amber-600 mt-0.5 shrink-0" />
             <p className="text-sm text-slate-600 leading-relaxed">
               <strong className="text-slate-800">本工具仍属于交互原型（Demo）。</strong>
-              当前范围使用启发式速度模型，最多模拟一次换乘；不含完整时刻表、道路步行网络或实时运营信息，不可用于实际导航。
+              当前范围使用启发式速度模型和不规则包络，最多模拟一次换乘；公交、完整时刻表、道路步行网络及实时运营信息尚未参与计算，不可用于实际导航。
             </p>
           </div>
         </div>

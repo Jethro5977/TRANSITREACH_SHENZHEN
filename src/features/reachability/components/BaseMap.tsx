@@ -123,6 +123,27 @@ function ViewController({ origin }: { origin: Origin | null }) {
   return null;
 }
 
+/** Fits the complete MultiPolygon after a calculation so the user can see its shape. */
+function ReachabilityView({ regions }: { regions: IsochroneRegion[] | null }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!regions?.length) return;
+    const points = regions
+      .flatMap(region => region.outer.map(([lon, lat]) => [lat, lon] as [number, number]))
+      .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon));
+    if (points.length < 3) return;
+    const lats = points.map(([lat]) => lat);
+    const lons = points.map(([, lon]) => lon);
+    map.fitBounds(
+      [[Math.min(...lats), Math.min(...lons)], [Math.max(...lats), Math.max(...lons)]],
+      { padding: [48, 48], maxZoom: 13, animate: true },
+    );
+  }, [regions, map]);
+
+  return null;
+}
+
 /**
  * The origin marker.
  *
@@ -217,6 +238,7 @@ export function BaseMap({ origin, regions, onMapClick }: BaseMapProps) {
         <ResizeHandler />
         <ClickHandler onMapClick={onMapClick} />
         <ViewController origin={origin} />
+        <ReachabilityView regions={regions} />
         <MetroStations />
         {/* The area is drawn first so the origin pin sits above the fill (AC 1.3.1). */}
         {regions && <ReachabilityLayer regions={regions} />}

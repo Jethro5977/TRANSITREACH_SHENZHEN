@@ -4,7 +4,7 @@ import {
   DEPARTURE_TIME,
   DEPARTURE_TIME_LABEL,
   DEPARTURE_TIME_IS_PROVISIONAL,
-} from '@/shared/data/adapters/routingAdapter';
+} from '@/shared/data/adapters/routingConfig';
 import type { LatLng, RailStop } from './types';
 import { SHENZHEN_CENTRE } from '@/shared/data/shenzhen/metro';
 
@@ -89,11 +89,11 @@ export const WALK_SPEED_KMH = Math.round(WALK_SPEED_MS * 3.6 * 10) / 10;
  * AC 1.3.3 / AC 1.2.3 — modes absent from the computation, named rather than passed over
  * in silence. The wording is the epic's own.
  */
-export const MODES_NOT_LOADED = '本 Demo 未加载公交、实时班次、拥堵和步行路网。';
+export const MODES_NOT_LOADED = '公交、官方时刻表、实时班次、拥堵和 OSM 步行路网尚未参与当前计算。';
 
 /** AC 1.3.3 — the static OSM snapshot and local estimator contain no realtime feed. */
 export const REALTIME_NOTE =
-  '本地结果由静态地铁站快照和启发式速度模型生成，不反映当前运营、施工、拥堵或临时封站情况。';
+  '本地结果由静态地铁站快照和不规则启发式包络生成，不反映当前运营、施工、拥堵、车辆位置或临时封站情况。深圳尚无本项目已核验可公开使用的 GTFS-Realtime feed。';
 
 // ---------------------------------------------------------------- data basis
 
@@ -179,7 +179,7 @@ export const BUDGET_COMPONENTS: BudgetComponent[] = [
   {
     label: '步行到首个地铁站',
     modelled: true,
-    status: `按 ${WALK_SPEED_KMH} km/h 估算；Demo 使用直线距离，尚未接入真实步行路网。`,
+    status: `按 ${WALK_SPEED_KMH} km/h 估算；使用方向性不规则包络表达边界不确定性，尚未接入真实步行路网。`,
   },
   {
     label: '候车时间',
@@ -202,7 +202,7 @@ export const BUDGET_COMPONENTS: BudgetComponent[] = [
   {
     label: '出站后步行',
     modelled: true,
-    status: `按剩余时间和 ${WALK_SPEED_KMH} km/h 估算，单站接驳半径最多 1.2 km。`,
+    status: `按剩余时间和 ${WALK_SPEED_KMH} km/h 生成单站不规则包络，最大尺度 1.2 km；重叠区域会合并。`,
   },
 ];
 

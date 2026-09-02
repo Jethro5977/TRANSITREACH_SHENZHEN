@@ -225,7 +225,7 @@ function ResultPanel({
           {/* AC 1.2.2 — this label comes from the state the area was computed with, never
               from the selector, so the two cannot disagree. */}
           <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-            {state.budgetMinutes} 分钟 Demo 可达范围
+            {state.budgetMinutes} 分钟本地模型可达范围
           </div>
           <div className="text-2xl font-bold text-slate-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {state.result.areaKm2.toFixed(1)}
@@ -233,13 +233,13 @@ function ResultPanel({
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
             {state.result.regions.length === 1
-              ? '1 个连续区域'
-              : `${state.result.regions.length} 个可达区域`}
+              ? '1 个融合后的不规则区域'
+              : `${state.result.regions.length} 个不连续区域块`}
           </div>
 
           {/* AC 1.3.1 — the boundary is modelled, not a surveyed line. */}
           <p className="text-[11px] text-slate-400 leading-snug mt-2 pt-2 border-t border-slate-200/70">
-            启发式模型边界，并非精确导航结果；边界内外的细小差异不具统计意义。
+            重叠站点包络已合并为不规则 Polygon；尚未使用真实道路图，并非精确导航结果。
           </p>
 
           {/* AC 1.2.4 — a valid finding, not an error. Dismissible, and it does not block
@@ -302,7 +302,7 @@ function DataBasisNote() {
       <div className="mt-2 space-y-1 text-[11px] leading-snug">
         <div>
           <span className="font-semibold text-slate-700">{basis.feedName}</span>
-          <span className="text-slate-500"> — {basis.lineCount} 条线路的静态站点快照</span>
+          <span className="text-slate-500"> — {basis.lineCount} 条线路静态快照 + 不规则包络</span>
         </div>
         <div className="text-slate-600">
           出发假设：{basis.dayLabel}
@@ -422,7 +422,7 @@ function CoveredAreaNote() {
   return (
     <p className="text-[11px] text-slate-500 leading-relaxed">
       <span className="font-semibold text-slate-600">可选范围：</span>
-      深圳市域 Demo 边界（按静态站点数据范围，外扩 {STUDY_AREA_BUFFER_KM} km）。公交、实时班次及真实步行路网尚未接入。
+      深圳市域 Demo 边界（按静态站点数据范围，外扩 {STUDY_AREA_BUFFER_KM} km）。公交、官方时刻表、实时班次及真实步行路网尚未参与当前计算。
     </p>
   );
 }

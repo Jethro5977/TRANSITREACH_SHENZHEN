@@ -6,13 +6,9 @@
  * It is useful for product interaction testing, not journey planning.
  */
 
+import polygonClipping, { type MultiPolygon, type Polygon as ClippingPolygon } from 'polygon-clipping';
 import { loadRailStops } from './gtfsAdapter';
-
-export const DEPARTURE_TIME = '2026-09-02T08:00:00+08:00';
-export const DEPARTURE_TIME_LABEL = '工作日 08:00（Demo 假设）';
-export const DEPARTURE_TIME_IS_PROVISIONAL = true;
-export const WALK_SPEED_MS = 1.33;
-export const COMPUTATION_TIMEOUT_MS = 2_000;
+import { WALK_SPEED_MS } from './routingConfig';
 
 export interface IsochroneRegion {
   outer: [number, number][];
@@ -69,39 +65,66 @@ function distanceKm(a: { lat: number; lon: number }, b: { lat: number; lon: numb
   return Math.hypot(dx, dy);
 }
 
-function circleRegion(circle: CircleCatchment, points = 40): IsochroneRegion {
+/**
+ * Builds a deterministic, anisotropic walking envelope.
+ *
+ * This is intentionally not a perfect circle: real walking catchments are constrained
+ * by blocks, entrances and the street mesh. Until an OSM pedestrian graph is deployed,
+ * the alternating radii make that uncertainty visible instead of suggesting impossible
+ * radial precision. It remains a heuristic and is labelled as such in the UI.
+ */
+function catchmentRegion(circle: CircleCatchment, points = 24): IsochroneRegion {
   const ring: [number, number][] = [];
+  const seed = Math.abs(Math.sin(circle.lat * 91.7 + circle.lon * 47.3));
   for (let i = 0; i <= points; i++) {
     const angle = (i / points) * Math.PI * 2;
-    const lat = circle.lat + Math.sin(angle) * circle.radiusKm / EARTH_KM_PER_DEG_LAT;
-    const lon = circle.lon + Math.cos(angle) * circle.radiusKm / kmPerDegLon(circle.lat);
+    const blockBias = 0.82 + 0.13 * Math.abs(Math.cos(angle * 2 + seed));
+    const streetVariation = 0.88 + 0.1 * Math.sin(angle * 5 + seed * 8) + 0.05 * Math.cos(angle * 3 - seed * 4);
+    const radiusKm = circle.radiusKm * Math.max(0.68, Math.min(1.04, blockBias * streetVariation));
+    const lat = circle.lat + Math.sin(angle) * radiusKm / EARTH_KM_PER_DEG_LAT;
+    const lon = circle.lon + Math.cos(angle) * radiusKm / kmPerDegLon(circle.lat);
     ring.push([lon, lat]);
   }
   return { outer: ring, holes: [] };
 }
 
-/** Grid-based union estimate so overlapping station circles are not double-counted. */
-function unionAreaKm2(circles: CircleCatchment[]): number {
-  if (circles.length === 0) return 0;
-  const lat0 = circles.reduce((sum, circle) => sum + circle.lat, 0) / circles.length;
-  const kx = kmPerDegLon(lat0);
-  const projected = circles.map(circle => ({
-    x: circle.lon * kx,
-    y: circle.lat * EARTH_KM_PER_DEG_LAT,
-    r: circle.radiusKm,
-  }));
-  const minX = Math.min(...projected.map(c => c.x - c.r));
-  const maxX = Math.max(...projected.map(c => c.x + c.r));
-  const minY = Math.min(...projected.map(c => c.y - c.r));
-  const maxY = Math.max(...projected.map(c => c.y + c.r));
-  const step = 0.2;
-  let cells = 0;
-  for (let y = minY + step / 2; y < maxY; y += step) {
-    for (let x = minX + step / 2; x < maxX; x += step) {
-      if (projected.some(c => Math.hypot(x - c.x, y - c.y) <= c.r)) cells++;
-    }
+function mergeCatchments(circles: CircleCatchment[]): IsochroneRegion[] {
+  if (circles.length === 0) return [];
+  const polygons: ClippingPolygon[] = circles.map(circle => [catchmentRegion(circle).outer]);
+  const merged: MultiPolygon = polygonClipping.union(polygons[0], ...polygons.slice(1));
+
+  return merged.flatMap(polygon => {
+    const [outer, ...holes] = polygon;
+    if (!outer || outer.length < 4) return [];
+    return [{
+      outer: outer.map(([lon, lat]) => [lon, lat]),
+      holes: holes
+        .filter(ring => ring.length >= 4)
+        .map(ring => ring.map(([lon, lat]) => [lon, lat])),
+    } satisfies IsochroneRegion];
+  });
+}
+
+function ringAreaKm2(ring: [number, number][], latitude: number): number {
+  const kx = kmPerDegLon(latitude);
+  let twiceArea = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [lonA, latA] = ring[i];
+    const [lonB, latB] = ring[i + 1];
+    twiceArea += (lonA * kx) * (latB * EARTH_KM_PER_DEG_LAT)
+      - (lonB * kx) * (latA * EARTH_KM_PER_DEG_LAT);
   }
-  return cells * step * step;
+  return Math.abs(twiceArea) / 2;
+}
+
+/** Exact polygon area after overlap union, including any unreachable holes. */
+function regionsAreaKm2(regions: IsochroneRegion[]): number {
+  return regions.reduce((sum, region) => {
+    const latitude = region.outer.reduce((total, [, lat]) => total + lat, 0) / region.outer.length;
+    const outerArea = ringAreaKm2(region.outer, latitude);
+    const holesArea = region.holes.reduce((total, hole) => total + ringAreaKm2(hole, latitude), 0);
+    return sum + Math.max(0, outerArea - holesArea);
+  }, 0);
 }
 
 function uniqueCircles(circles: CircleCatchment[]): CircleCatchment[] {
@@ -166,18 +189,19 @@ export async function computeReachability(
   }
 
   const displayCircles = uniqueCircles(circles);
+  const regions = mergeCatchments(displayCircles);
   const walkingOnly = displayCircles.length === 1;
   const durationMs = performance.now() - startedAt;
   if (import.meta.env.DEV) {
-    console.info(`[TransitReach] 可达范围计算 ${durationMs.toFixed(1)}ms (${budgetMinutes}min, ${displayCircles.length} regions)`);
+    console.info(`[TransitReach] 可达范围计算 ${durationMs.toFixed(1)}ms (${budgetMinutes}min, ${regions.length} merged regions)`);
   }
   return {
     walkingOnly,
     durationMs,
     result: {
       budgetMinutes,
-      regions: displayCircles.map(circle => circleRegion(circle)),
-      areaKm2: unionAreaKm2(displayCircles),
+      regions,
+      areaKm2: regionsAreaKm2(regions),
     },
   };
 }
