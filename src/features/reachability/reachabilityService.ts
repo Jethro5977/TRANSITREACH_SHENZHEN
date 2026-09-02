@@ -89,7 +89,7 @@ export const WALK_SPEED_KMH = Math.round(WALK_SPEED_MS * 3.6 * 10) / 10;
  * AC 1.3.3 / AC 1.2.3 — modes absent from the computation, named rather than passed over
  * in silence. The wording is the epic's own.
  */
-export const MODES_NOT_LOADED = '公交、官方时刻表、实时班次、拥堵和 OSM 步行路网尚未参与当前计算。';
+export const MODES_NOT_LOADED = '公交、授权时刻表、实时班次、拥堵和完整 OSM 步行路网尚未参与当前计算。';
 
 /** AC 1.3.3 — the static OSM snapshot and local estimator contain no realtime feed. */
 export const REALTIME_NOTE =
@@ -179,7 +179,7 @@ export const BUDGET_COMPONENTS: BudgetComponent[] = [
   {
     label: '步行到首个地铁站',
     modelled: true,
-    status: `按 ${WALK_SPEED_KMH} km/h 估算；使用方向性不规则包络表达边界不确定性，尚未接入真实步行路网。`,
+    status: `按 ${WALK_SPEED_KMH} km/h 估算；使用方向性包络，并避开 OSM 水域与高速缓冲区；尚未接入完整步行路网。`,
   },
   {
     label: '候车时间',
@@ -218,7 +218,7 @@ export const BUDGET_ASSUMPTIONS = [
   {
     label: '出发时间',
     status: DEPARTURE_TIME_IS_PROVISIONAL
-      ? `${DEPARTURE_TIME_LABEL}. Reachability differs at other times of day.`
+      ? `${DEPARTURE_TIME_LABEL} 是默认值；地图中的出发时间选择器会在授权时刻表接入后改变候车时间。`
       : DEPARTURE_TIME_LABEL,
   },
   {

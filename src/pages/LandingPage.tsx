@@ -26,8 +26,8 @@ export function LandingPage() {
               <span className="text-xs font-bold text-teal-700">深圳公共交通可达性工具</span>
             </div>
             <h1 className="text-4xl sm:text-6xl font-extrabold text-slate-900 leading-[1.05] tracking-tight mb-6">
-              看见深圳地铁能把你带到的
-              <span className="block bg-gradient-to-r from-teal-600 to-blue-600 bg-clip-text text-transparent">每一种可能</span>
+              输入你的起点，看看
+              <span className="block bg-gradient-to-r from-teal-600 to-blue-600 bg-clip-text text-transparent">30 分钟能到哪里</span>
             </h1>
             <p className="text-lg text-slate-600 leading-relaxed max-w-2xl mb-8">
               选择一个深圳地铁站或地图坐标，设置 15–60 分钟时间预算，快速探索步行与地铁组合下的可达范围。
@@ -93,7 +93,7 @@ export function LandingPage() {
             <Building2 size={19} className="text-amber-600 mt-0.5 shrink-0" />
             <p className="text-sm text-slate-600 leading-relaxed">
               <strong className="text-slate-800">本工具仍属于交互原型（Demo）。</strong>
-              当前范围使用启发式速度模型和不规则包络，最多模拟一次换乘；公交、完整时刻表、道路步行网络及实时运营信息尚未参与计算，不可用于实际导航。
+              当前范围使用启发式速度模型，并会避开 OSM 水域与高速缓冲区，最多模拟一次换乘；公交、完整时刻表、完整步行道路网络及实时运营信息尚未参与计算，不可用于实际导航。
             </p>
           </div>
         </div>

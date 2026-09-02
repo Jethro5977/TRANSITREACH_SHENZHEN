@@ -7,8 +7,15 @@
  */
 
 import polygonClipping, { type MultiPolygon, type Polygon as ClippingPolygon } from 'polygon-clipping';
-import { loadRailStops } from './gtfsAdapter';
-import { WALK_SPEED_MS } from './routingConfig';
+import { getIntersectingBarrierPolygons } from '../shenzhen/barriers';
+import {
+  getDepartureProfile,
+  getWaitMinutes,
+  TIMETABLE_STATUS,
+  type DepartureProfileId,
+} from '../shenzhen/timetable';
+import { loadRailStops, type RailStop } from './gtfsAdapter';
+import { COMPUTATION_TIMEOUT_MS, WALK_SPEED_MS } from './routingConfig';
 
 export interface IsochroneRegion {
   outer: [number, number][];
@@ -18,6 +25,15 @@ export interface IsochroneResult {
   budgetMinutes: number;
   regions: IsochroneRegion[];
   areaKm2: number;
+  reachableStations: ReachableStation[];
+  departureLabel: string;
+  timetableStatus: 'verified' | 'demo-fallback';
+}
+
+export interface ReachableStation {
+  stop: RailStop;
+  travelMinutes: number;
+  transfers: 0 | 1;
 }
 
 export interface ReachabilityComputation {
@@ -47,9 +63,13 @@ interface CircleCatchment {
   radiusKm: number;
 }
 
+interface JourneyEstimate {
+  minutes: number;
+  transfers: 0 | 1;
+}
+
 const WALK_KMH = WALK_SPEED_MS * 3.6;
 const METRO_KMH = 34;
-const WAIT_MINUTES = 4;
 const TRANSFER_MINUTES = 4;
 const MAX_ACCESS_KM = 1.35;
 const MAX_EGRESS_KM = 1.2;
@@ -88,12 +108,8 @@ function catchmentRegion(circle: CircleCatchment, points = 24): IsochroneRegion 
   return { outer: ring, holes: [] };
 }
 
-function mergeCatchments(circles: CircleCatchment[]): IsochroneRegion[] {
-  if (circles.length === 0) return [];
-  const polygons: ClippingPolygon[] = circles.map(circle => [catchmentRegion(circle).outer]);
-  const merged: MultiPolygon = polygonClipping.union(polygons[0], ...polygons.slice(1));
-
-  return merged.flatMap(polygon => {
+function regionsFromMultiPolygon(geometry: MultiPolygon): IsochroneRegion[] {
+  return geometry.flatMap(polygon => {
     const [outer, ...holes] = polygon;
     if (!outer || outer.length < 4) return [];
     return [{
@@ -103,6 +119,38 @@ function mergeCatchments(circles: CircleCatchment[]): IsochroneRegion[] {
         .map(ring => ring.map(([lon, lat]) => [lon, lat])),
     } satisfies IsochroneRegion];
   });
+}
+
+function mergeCatchments(circles: CircleCatchment[]): IsochroneRegion[] {
+  if (circles.length === 0) return [];
+  const polygons: ClippingPolygon[] = circles.map(circle => [catchmentRegion(circle).outer]);
+  const merged: MultiPolygon = polygonClipping.union(polygons[0], ...polygons.slice(1));
+  return regionsFromMultiPolygon(merged);
+}
+
+/**
+ * OSM water and motorway buffers remove clearly non-walkable ground from each local
+ * envelope. This is a barrier-clipped heuristic, not a substitute for a pedestrian
+ * routing graph; each region only considers barriers overlapping its own bounds.
+ */
+async function clipRegionsByBarriers(regions: IsochroneRegion[]): Promise<IsochroneRegion[]> {
+  const clipped = await Promise.all(regions.map(async region => {
+    const lons = region.outer.map(([lon]) => lon);
+    const lats = region.outer.map(([, lat]) => lat);
+    const barriers = await getIntersectingBarrierPolygons({
+      minLon: Math.min(...lons), maxLon: Math.max(...lons),
+      minLat: Math.min(...lats), maxLat: Math.max(...lats),
+    });
+    if (barriers.length === 0) return [region];
+    try {
+      return regionsFromMultiPolygon(polygonClipping.difference([region.outer, ...region.holes], ...barriers));
+    } catch {
+      // OSM geometry may occasionally be topologically invalid after simplification.
+      // Keeping the uncut heuristic is safer than dropping a valid reachability result.
+      return [region];
+    }
+  }));
+  return clipped.flat();
 }
 
 function ringAreaKm2(ring: [number, number][], latitude: number): number {
@@ -138,9 +186,19 @@ function uniqueCircles(circles: CircleCatchment[]): CircleCatchment[] {
   return result;
 }
 
+function setShortestJourney(
+  journeys: Map<string, JourneyEstimate>,
+  stopId: string,
+  candidate: JourneyEstimate,
+) {
+  const previous = journeys.get(stopId);
+  if (!previous || candidate.minutes < previous.minutes) journeys.set(stopId, candidate);
+}
+
 export async function computeReachability(
   origin: { lat: number; lon: number },
   budgetMinutes: number,
+  departureProfileId: DepartureProfileId,
   signal: AbortSignal,
 ): Promise<ReachabilityComputation> {
   // Yield one frame so React can paint its computing state before synchronous geometry.
@@ -155,33 +213,47 @@ export async function computeReachability(
     .map(stop => ({ stop, distance: distanceKm(origin, stop) }))
     .filter(item => item.distance <= MAX_ACCESS_KM);
   const interchangeStops = stops.filter(stop => stop.lines.length >= 2);
+  const reachableByStop = new Map<string, ReachableStation>();
 
   for (const access of accessStops) {
     const accessMinutes = (access.distance / WALK_KMH) * 60;
-    const journeyMinutes = new Map<string, number>();
+    const journeyMinutes = new Map<string, JourneyEstimate>();
 
     for (const destination of stops) {
-      if (!access.stop.lines.some(line => destination.lines.includes(line))) continue;
-      journeyMinutes.set(destination.stopId, WAIT_MINUTES + (distanceKm(access.stop, destination) / METRO_KMH) * 60);
+      const sharedLines = access.stop.lines.filter(line => destination.lines.includes(line));
+      if (sharedLines.length === 0) continue;
+      setShortestJourney(journeyMinutes, destination.stopId, {
+        minutes: getWaitMinutes(sharedLines, departureProfileId).minutes + (distanceKm(access.stop, destination) / METRO_KMH) * 60,
+        transfers: 0,
+      });
     }
 
     for (const interchange of interchangeStops) {
       const firstLines = access.stop.lines.filter(line => interchange.lines.includes(line));
       if (firstLines.length === 0 || interchange.lines.length < 2) continue;
-      const firstLegMinutes = WAIT_MINUTES + (distanceKm(access.stop, interchange) / METRO_KMH) * 60;
+      const firstLegMinutes = getWaitMinutes(firstLines, departureProfileId).minutes + (distanceKm(access.stop, interchange) / METRO_KMH) * 60;
       const onwardLines = interchange.lines.filter(line => !firstLines.includes(line));
       for (const destination of stops) {
-        if (!destination.lines.some(line => onwardLines.includes(line))) continue;
-        const total = firstLegMinutes + TRANSFER_MINUTES + (distanceKm(interchange, destination) / METRO_KMH) * 60;
-        const previous = journeyMinutes.get(destination.stopId);
-        if (previous === undefined || total < previous) journeyMinutes.set(destination.stopId, total);
+        const destinationLines = destination.lines.filter(line => onwardLines.includes(line));
+        if (destinationLines.length === 0) continue;
+        setShortestJourney(journeyMinutes, destination.stopId, {
+          minutes: firstLegMinutes + TRANSFER_MINUTES + getWaitMinutes(destinationLines, departureProfileId).minutes + (distanceKm(interchange, destination) / METRO_KMH) * 60,
+          transfers: 1,
+        });
       }
     }
 
     for (const stop of stops) {
-      const metroMinutes = journeyMinutes.get(stop.stopId);
-      if (metroMinutes === undefined) continue;
-      const remaining = budgetMinutes - accessMinutes - metroMinutes;
+      const journey = journeyMinutes.get(stop.stopId);
+      if (!journey) continue;
+      const totalMinutes = accessMinutes + journey.minutes;
+      if (totalMinutes <= budgetMinutes) {
+        const previous = reachableByStop.get(stop.stopId);
+        if (!previous || totalMinutes < previous.travelMinutes) {
+          reachableByStop.set(stop.stopId, { stop, travelMinutes: totalMinutes, transfers: journey.transfers });
+        }
+      }
+      const remaining = budgetMinutes - totalMinutes;
       if (remaining < 2) continue;
       const radiusKm = Math.min(MAX_EGRESS_KM, (remaining / 60) * WALK_KMH);
       circles.push({ lat: stop.lat, lon: stop.lon, radiusKm });
@@ -189,9 +261,16 @@ export async function computeReachability(
   }
 
   const displayCircles = uniqueCircles(circles);
-  const regions = mergeCatchments(displayCircles);
+  const regions = await clipRegionsByBarriers(mergeCatchments(displayCircles));
   const walkingOnly = displayCircles.length === 1;
+  const departureProfile = getDepartureProfile(departureProfileId);
+  const reachableStations = [...reachableByStop.values()].sort((a, b) =>
+    a.travelMinutes - b.travelMinutes || a.stop.name.localeCompare(b.stop.name, 'zh-CN'),
+  );
   const durationMs = performance.now() - startedAt;
+  if (durationMs > COMPUTATION_TIMEOUT_MS) {
+    throw new RoutingTimeoutError(COMPUTATION_TIMEOUT_MS);
+  }
   if (import.meta.env.DEV) {
     console.info(`[TransitReach] 可达范围计算 ${durationMs.toFixed(1)}ms (${budgetMinutes}min, ${regions.length} merged regions)`);
   }
@@ -202,6 +281,9 @@ export async function computeReachability(
       budgetMinutes,
       regions,
       areaKm2: regionsAreaKm2(regions),
+      reachableStations,
+      departureLabel: departureProfile.label,
+      timetableStatus: TIMETABLE_STATUS.available ? 'verified' : 'demo-fallback',
     },
   };
 }

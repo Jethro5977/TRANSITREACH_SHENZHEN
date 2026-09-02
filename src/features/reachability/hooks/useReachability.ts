@@ -4,6 +4,7 @@ import {
   RoutingTimeoutError,
   type IsochroneResult,
 } from '@/shared/data/adapters/routingAdapter';
+import { DEFAULT_DEPARTURE_PROFILE, type DepartureProfileId } from '@/shared/data/shenzhen/timetable';
 import type { LatLng, Origin, RailStop } from '../types';
 import { isInStudyArea } from '../reachabilityService';
 
@@ -41,6 +42,7 @@ export function useReachability(
     initialStop ? { at: { lat: initialStop.lat, lon: initialStop.lon }, source: 'stop', stop: initialStop } : null,
   );
   const [timeBudget, setTimeBudget] = useState(DEFAULT_TIME_BUDGET);
+  const [departureProfile, setDepartureProfile] = useState<DepartureProfileId>(DEFAULT_DEPARTURE_PROFILE);
   const [state, setState] = useState<ReachabilityState>({ status: 'idle' });
 
   // Guards against a superseded result ever reaching the screen. Every run takes a
@@ -49,7 +51,7 @@ export function useReachability(
   const inFlight = useRef<AbortController | null>(null);
 
   const run = useCallback(
-    (at: LatLng, budgetMinutes: number) => {
+    (at: LatLng, budgetMinutes: number, profile: DepartureProfileId) => {
       inFlight.current?.abort();
       const controller = new AbortController();
       inFlight.current = controller;
@@ -59,7 +61,7 @@ export function useReachability(
       // starts, not when it finishes, so two areas are never on the map at once.
       setState({ status: 'computing', budgetMinutes });
 
-      computeReachability(at, budgetMinutes, controller.signal)
+      computeReachability(at, budgetMinutes, profile, controller.signal)
         .then(({ result, walkingOnly }) => {
           if (ticket !== runId.current) return; // superseded — discard, never render
           setState({ status: 'ready', budgetMinutes, result, walkingOnly });
@@ -88,8 +90,8 @@ export function useReachability(
       setState({ status: 'idle' });
       return;
     }
-    run(origin.at, timeBudget);
-  }, [origin, timeBudget, run]);
+    run(origin.at, timeBudget, departureProfile);
+  }, [origin, timeBudget, departureProfile, run]);
 
   useEffect(() => () => inFlight.current?.abort(), []);
 
@@ -138,21 +140,24 @@ export function useReachability(
 
   /** AC 1.1.5 / AC 1.2.2 — the budget survives a change of starting point, and vice versa. */
   const changeTimeBudget = (minutes: number) => setTimeBudget(minutes);
+  const changeDepartureProfile = (profile: DepartureProfileId) => setDepartureProfile(profile);
 
   /** AC 1.3.2 — re-runs the same settings without the user re-entering anything. */
   const retry = () => {
-    if (origin) run(origin.at, timeBudget);
+    if (origin) run(origin.at, timeBudget, departureProfile);
   };
 
   return {
     origin,
     timeBudget,
+    departureProfile,
     state,
     selectStop,
     selectPoint,
     requestDeviceLocation,
     clearOrigin,
     changeTimeBudget,
+    changeDepartureProfile,
     retry,
   };
 }

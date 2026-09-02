@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { AlertTriangle, ChevronDown, Clock, Crosshair, Database, Footprints, Loader2, Maximize2, Minimize2, RotateCw, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Clock, Crosshair, Database, Footprints, Loader2, MapPin, Maximize2, Minimize2, RotateCw, TrainFront, X } from 'lucide-react';
 import { Tooltip } from '@/shared/ui';
 import { BaseMap } from '@/features/reachability/components/BaseMap';
+import { DepartureTimeSelector } from '@/features/reachability/components/DepartureTimeSelector';
 import { LocationSearch } from '@/features/reachability/components/LocationSearch';
 import { TimeBudgetSelector } from '@/features/reachability/components/TimeBudgetSelector';
 import { useReachability, type ReachabilityState } from '@/features/reachability/hooks/useReachability';
@@ -107,6 +108,11 @@ export function MapPage({ onToast }: MapPageProps) {
                 <TimeBudgetSelector value={reach.timeBudget} onChange={reach.changeTimeBudget} />
               </div>
 
+              <div>
+                <label className="text-xs font-semibold text-slate-500 mb-1.5 block">出发时间</label>
+                <DepartureTimeSelector value={reach.departureProfile} onChange={reach.changeDepartureProfile} />
+              </div>
+
               <BudgetCompositionNote />
 
               <div className="pt-2 border-t border-slate-200/70">
@@ -164,11 +170,12 @@ function ResultPanel({
   onRetry: () => void;
 }) {
   const [dismissed, setDismissed] = useState<number | null>(null);
+  const [expandedStations, setExpandedStations] = useState(false);
 
   if (state.status === 'idle') return null;
 
   return (
-    <div className="absolute top-4 right-4 sm:right-6 z-[500] w-[300px] max-w-[calc(100vw-2rem)]">
+    <div className="absolute top-4 right-4 sm:right-6 z-[500] w-[300px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-thin">
       {state.status === 'computing' && (
         <div className="glass p-3.5 flex items-center gap-2.5">
           <Loader2 size={16} className="spinner text-teal-600 shrink-0" />
@@ -239,8 +246,41 @@ function ResultPanel({
 
           {/* AC 1.3.1 — the boundary is modelled, not a surveyed line. */}
           <p className="text-[11px] text-slate-400 leading-snug mt-2 pt-2 border-t border-slate-200/70">
-            重叠站点包络已合并为不规则 Polygon；尚未使用真实道路图，并非精确导航结果。
+            重叠站点包络会避开 OSM 水域与高速缓冲区；仍未使用完整步行道路图，并非精确导航结果。
           </p>
+
+          <div className="mt-3 pt-3 border-t border-slate-200/70">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+              <MapPin size={13} className="text-teal-700" />
+              可达地铁站（{state.result.reachableStations.length} / 266）
+            </div>
+            <div className="mt-2 space-y-1.5">
+              {state.result.reachableStations.slice(0, expandedStations ? undefined : 6).map(station => (
+                <div key={station.stop.stopId} className="rounded-lg bg-slate-50/80 px-2 py-1.5 flex items-center gap-2">
+                  <TrainFront size={12} className="text-slate-400 shrink-0" />
+                  <span className="text-[11px] font-semibold text-slate-700 min-w-0 flex-1 truncate">{station.stop.name}</span>
+                  <span className="text-[10px] text-slate-500 whitespace-nowrap">{Math.ceil(station.travelMinutes)} min</span>
+                  <span className={`text-[9px] whitespace-nowrap ${station.transfers === 0 ? 'text-emerald-700' : 'text-blue-700'}`}>
+                    {station.transfers === 0 ? '直达' : '1 次换乘'}
+                  </span>
+                </div>
+              ))}
+              {state.result.reachableStations.length === 0 && (
+                <p className="text-[11px] text-slate-500">当前预算内没有满足模型条件的地铁站。</p>
+              )}
+            </div>
+            {state.result.reachableStations.length > 6 && (
+              <button
+                onClick={() => setExpandedStations(value => !value)}
+                className="mt-2 text-[11px] font-semibold text-teal-700 hover:text-teal-900"
+              >
+                {expandedStations ? '收起站点列表' : `展开全部 ${state.result.reachableStations.length} 个站点`}
+              </button>
+            )}
+            <p className="text-[10px] text-slate-400 leading-snug mt-2">
+              到达时间含起点步行、模型候车、车内与最多一次换乘估算；不代表运营方行程建议。
+            </p>
+          </div>
 
           {/* AC 1.2.4 — a valid finding, not an error. Dismissible, and it does not block
               interaction with the map. */}
@@ -263,7 +303,12 @@ function ResultPanel({
       )}
 
       {/* AC 1.3.3 — the data basis accompanies a displayed result, and only a result. */}
-      {state.status === 'ready' && <DataBasisNote />}
+      {state.status === 'ready' && (
+        <DataBasisNote
+          departureLabel={state.result.departureLabel}
+          timetableStatus={state.result.timetableStatus}
+        />
+      )}
     </div>
   );
 }
@@ -276,7 +321,13 @@ function ResultPanel({
  * engine was actually built on. The OpenStreetMap attribution required by the same
  * criterion is Leaflet's own control on the map, which is not dismissible.
  */
-function DataBasisNote() {
+function DataBasisNote({
+  departureLabel,
+  timetableStatus,
+}: {
+  departureLabel: string;
+  timetableStatus: 'verified' | 'demo-fallback';
+}) {
   const [open, setOpen] = useState(false);
   const basis = getDataBasis();
 
@@ -302,13 +353,16 @@ function DataBasisNote() {
       <div className="mt-2 space-y-1 text-[11px] leading-snug">
         <div>
           <span className="font-semibold text-slate-700">{basis.feedName}</span>
-          <span className="text-slate-500"> — {basis.lineCount} 条线路静态快照 + 不规则包络</span>
+          <span className="text-slate-500"> — {basis.lineCount} 条线路静态快照 + OSM 障碍物裁剪包络</span>
         </div>
         <div className="text-slate-600">
-          出发假设：{basis.dayLabel}
+          出发设置：{departureLabel}
           {basis.activeCalendars.length > 0 && (
             <span className="text-slate-400"> (calendar {basis.activeCalendars.join(', ')})</span>
           )}
+        </div>
+        <div className="text-slate-600">
+          候车：{timetableStatus === 'verified' ? '授权时刻表的半个发车间隔估算。' : '官方时刻表未授权导入，固定按 4 分钟 Demo 估算。'}
         </div>
         <div className="text-slate-600">{basis.modesNotLoaded}</div>
       </div>

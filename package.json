@@ -1,7 +1,7 @@
 {
   "name": "transitreach-shenzhen",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "深圳公共交通时间可达性前端演示",
   "type": "module",
   "scripts": {
@@ -10,9 +10,12 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
-    "data:metro": "node scripts/build-shenzhen-metro.mjs"
+    "data:metro": "node scripts/build-shenzhen-metro.mjs",
+    "data:barriers": "node scripts/build-shenzhen-barriers.mjs",
+    "data:timetable": "node scripts/build-shenzhen-timetable.mjs"
   },
   "dependencies": {
+    "@turf/turf": "^7.4.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.446.0",
     "polygon-clipping": "^0.15.7",
