@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ArrowRight, Building2, Clock3, Database, MapPin, Route, Sparkles, TrainFront } from 'lucide-react';
-import { LocationSearch } from '@/features/reachability/components/LocationSearch';
-import type { RailStop } from '@/features/reachability/types';
+import { AlertTriangle, ArrowRight, Building2, Check, Clock3, Database, MapPin, Route, Sparkles, TrainFront, type LucideIcon } from 'lucide-react';
+import { LocationSearch, type LocationSearchResult } from '@/features/reachability/components/LocationSearch';
+import { isPlaceResult, type RailStop } from '@/features/reachability/types';
 import { SHENZHEN_DATA_SNAPSHOT_LABEL, SHENZHEN_METRO_LINES, SHENZHEN_METRO_STOPS } from '@/shared/data/shenzhen/metro';
 import { useNavigate } from 'react-router-dom';
 const FEATURED_STATIONS = ['深圳北', '福田', '车公庙', '前海湾', '岗厦北', '老街'];
@@ -10,9 +10,14 @@ export function LandingPage() {
   const [selected, setSelected] = useState<RailStop | null>(null);
   const navigate = useNavigate();
 
-  const chooseStop = (stop: RailStop) => {
-    setSelected(stop);
-    navigate(`/map?stop=${encodeURIComponent(stop.stopId)}`);
+  const chooseLocation = (result: LocationSearchResult) => {
+    if (isPlaceResult(result)) {
+      setSelected(null);
+      navigate(`/map?lat=${encodeURIComponent(result.lat)}&lon=${encodeURIComponent(result.lon)}&name=${encodeURIComponent(result.name)}`);
+      return;
+    }
+    setSelected(result);
+    navigate(`/map?stop=${encodeURIComponent(result.stopId)}`);
   };
 
   return (
@@ -33,13 +38,13 @@ export function LandingPage() {
               选择一个深圳地铁站或地图坐标，设置 15–60 分钟时间预算，快速探索步行与地铁组合下的可达范围。
             </p>
             <div className="max-w-lg mb-5">
-              <LocationSearch onSelect={chooseStop} selected={selected} />
+              <LocationSearch onSelect={chooseLocation} selected={selected} />
             </div>
             <div className="flex flex-wrap gap-2 mb-8">
               {FEATURED_STATIONS.map(name => {
                 const stop = SHENZHEN_METRO_STOPS.find(item => item.name === name);
                 return stop ? (
-                  <button key={name} onClick={() => chooseStop(stop)} className="chip chip-unselected text-xs">
+                  <button key={name} onClick={() => chooseLocation(stop)} className="chip chip-unselected text-xs">
                     {name}
                   </button>
                 ) : null;
@@ -89,6 +94,16 @@ export function LandingPage() {
             <InfoCard icon={TrainFront} title="深圳轨道快照" text="包含 266 个 OSM 去重站点与 11 条线路关系。" />
             <InfoCard icon={Database} title="来源透明" text={`开放地图坐标与模型假设持续说明 · 数据快照 ${SHENZHEN_DATA_SNAPSHOT_LABEL}。`} />
           </div>
+          <section className="mt-10 border-t border-slate-200/80 pt-10" aria-labelledby="capabilities-title">
+            <h2 id="capabilities-title" className="text-2xl font-extrabold text-slate-900">这个工具能做什么</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">用用户语言说明当前可用能力与边界，帮助你正确理解地图上的结果。</p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <CapabilityCard icon={Check} title="估算地铁可达范围" text="选择起点和时间预算，查看步行、地铁与一次换乘组合下的大致可达区域。" status="available" />
+              <CapabilityCard icon={Check} title="对比不同时间预算" text="快速切换 15、30、45、60 分钟，直观感受时间预算对可达范围的影响。" status="available" />
+              <CapabilityCard icon={AlertTriangle} title="数据为 Demo 近似值" text="当前使用启发式速度模型，不含真实时刻表、公交和完整步行道路网络；结果不可用于实际通勤规划。" status="limitation" />
+              <CapabilityCard icon={AlertTriangle} title="仅覆盖地铁" text="暂未接入公交系统；实际通勤中公交与步行接驳可显著扩展可达范围。" status="limitation" />
+            </div>
+          </section>
           <div className="mt-6 glass p-5 flex gap-3 items-start border border-amber-200/70">
             <Building2 size={19} className="text-amber-600 mt-0.5 shrink-0" />
             <p className="text-sm text-slate-600 leading-relaxed">
@@ -120,5 +135,20 @@ function InfoCard({ icon: Icon, title, text }: { icon: typeof MapPin; title: str
       <h2 className="font-bold text-slate-900 mb-1">{title}</h2>
       <p className="text-sm text-slate-600 leading-relaxed">{text}</p>
     </div>
+  );
+}
+
+function CapabilityCard({ icon: Icon, title, text, status }: { icon: LucideIcon; title: string; text: string; status: 'available' | 'limitation' }) {
+  const available = status === 'available';
+  return (
+    <article className={`rounded-2xl border bg-white/70 p-5 border-l-4 ${available ? 'border-slate-200 border-l-emerald-500' : 'border-amber-200 border-l-amber-500'}`}>
+      <div className="flex items-start gap-3">
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${available ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}><Icon size={18} /></div>
+        <div>
+          <h3 className="font-bold text-slate-900">{title}</h3>
+          <p className="mt-1 text-sm leading-relaxed text-slate-600">{text}</p>
+        </div>
+      </div>
+    </article>
   );
 }

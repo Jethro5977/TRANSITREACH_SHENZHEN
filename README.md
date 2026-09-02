@@ -13,14 +13,14 @@
 ## 当前能力
 
 - 中文首页与深圳默认地图视图
-- 搜索 266 个去重地铁站静态快照，或直接点击地图设置出发点
+- 站名优先搜索 266 个去重地铁站静态快照；无站名匹配时可手动查询 OSM 地点，并显示 1.5 km 内的地铁站选择
 - 比较 15、30、45、60 分钟时间预算
 - 显示步行接驳、直达地铁与最多一次换乘的估算可达区域
 - 将重叠站点包络做 polygon union，显示不规则 Polygon/MultiPolygon，而不是一组圆圈
 - 用 OSM 水域、河渠与高速公路缓冲区裁剪可达边界；障碍物数据仅在首次计算时按需加载
 - 结果面板列出可达地铁站、模型到达时间与直达/一次换乘标记
 - 提供出发时间选择器；未取得授权时刻表前，所有选项明确回退为固定 4 分钟候车估算
-- 在界面内公开展示数据来源、参数和未建模限制
+- 通过独立 Info 弹窗公开展示数据来源、参数、覆盖范围和未建模限制
 - 支持 `/map`、`/methodology` 直达链接、中文 404 与 PWA 安装元数据
 - 地图页按需加载；站点按线路颜色显示，并在低缩放级别自动缩小以减少重叠
 - 地图瓦片加载 skeleton、计算状态与模型边界说明
@@ -66,6 +66,10 @@ npm run data:barriers
 
 因此，结果适合用来演示交互和讨论可达性概念，**不可用于实际出行导航或公共决策**。
 
+### 地点搜索服务
+
+地点搜索使用公开 Nominatim 服务，但不会做自动补全：只有用户点击“搜索地点”或按 Enter 才会请求；全站请求严格限为每秒最多一次，并对同一查询做会话缓存。浏览器无法自定义 `User-Agent`，因此以部署站点的 `Referer` 标识请求。若需要迁移服务，可在构建环境设置 `VITE_GEOCODER_ENDPOINT`，无需改动应用代码。部署前应复核 [Nominatim 使用政策](https://operations.osmfoundation.org/policies/nominatim/)；它禁止客户端自动补全，也要求应用展示 OSM 署名。
+
 ## 正式化路线
 
 生产级版本应使用完整、可验证的深圳轨道与公交数据构建 OpenTripPlanner 图，并加入 OSM 步行路网、换乘规则、服务设施数据和后端健康监控。已核验的数据目录、许可限制和 GitHub 开源选型见 [深圳交通数据与开源路由选型](docs/DATA_AND_OPEN_SOURCE_PLAN.md)。
@@ -88,5 +92,6 @@ npm run data:timetable
 - [深圳市政府数据开放平台](https://opendata.sz.gov.cn/)
 - [深圳市政府数据开放平台服务条款](https://opendata.sz.gov.cn/maintenance/forward/toTermOfService)
 - [OpenStreetMap 版权与许可](https://www.openstreetmap.org/copyright)
+- [Nominatim 使用政策](https://operations.osmfoundation.org/policies/nominatim/)
 - [OpenTripPlanner](https://github.com/opentripplanner/OpenTripPlanner)
 - [Valhalla](https://github.com/valhalla/valhalla)

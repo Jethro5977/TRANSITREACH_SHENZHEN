@@ -1,33 +1,57 @@
-import { useState } from 'react';
-import { AlertTriangle, ChevronDown, Clock, Crosshair, Database, Footprints, Loader2, MapPin, Maximize2, Minimize2, RotateCw, TrainFront, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { AlertTriangle, Clock, Crosshair, Footprints, Info, Loader2, MapPin, Maximize2, Minimize2, RotateCw, TrainFront, X } from 'lucide-react';
 import { Tooltip } from '@/shared/ui';
 import { BaseMap } from '@/features/reachability/components/BaseMap';
 import { DepartureTimeSelector } from '@/features/reachability/components/DepartureTimeSelector';
-import { LocationSearch } from '@/features/reachability/components/LocationSearch';
+import { LocationSearch, type LocationSearchResult } from '@/features/reachability/components/LocationSearch';
+import { InfoModal } from '@/features/reachability/components/InfoModal';
+import { NearbyStopsPanel, type NearbyStop } from '@/features/reachability/components/NearbyStopsPanel';
 import { TimeBudgetSelector } from '@/features/reachability/components/TimeBudgetSelector';
 import { useReachability, type ReachabilityState } from '@/features/reachability/hooks/useReachability';
-import type { RailStop } from '@/features/reachability/types';
+import { isPlaceResult, type PlaceResult, type RailStop } from '@/features/reachability/types';
 import {
   formatCoord,
-  STUDY_AREA_BUFFER_KM,
-  BUDGET_COMPONENTS,
-  BUDGET_ASSUMPTIONS,
-  getDataBasis,
 } from '@/features/reachability/reachabilityService';
 import { linesForStop } from '@/shared/data/adapters/gtfsAdapter';
 import { loadRailStops } from '@/shared/data/adapters/gtfsAdapter';
 import { useSearchParams } from 'react-router-dom';
+import { getDepartureProfile } from '@/shared/data/shenzhen/timetable';
 
 interface MapPageProps {
   onToast: (message: string, icon?: string) => void;
+}
+
+function parsePlaceSearchParams(searchParams: URLSearchParams): PlaceResult | null {
+  const lat = Number.parseFloat(searchParams.get('lat') ?? '');
+  const lon = Number.parseFloat(searchParams.get('lon') ?? '');
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const name = searchParams.get('name')?.trim() || '地图选点';
+  return { lat, lon, name, fullName: name, type: 'place' };
+}
+
+function distanceKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const latScale = 110.574;
+  const lonScale = 111.32 * Math.cos(((a.lat + b.lat) / 2) * Math.PI / 180);
+  return Math.hypot((a.lat - b.lat) * latScale, (a.lon - b.lon) * lonScale);
 }
 
 export function MapPage({ onToast }: MapPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const stopId = searchParams.get('stop');
   const initialLocation = loadRailStops().find(stop => stop.stopId === stopId) ?? null;
+  const initialPlace = useMemo(() => initialLocation ? null : parsePlaceSearchParams(searchParams), [initialLocation, searchParams]);
   const [configOpen, setConfigOpen] = useState(true);
-  const reach = useReachability(initialLocation, onToast);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [nearbyPlace, setNearbyPlace] = useState<PlaceResult | null>(initialPlace);
+  const reach = useReachability(initialLocation, initialPlace, onToast);
+
+  const nearbyStops = useMemo<NearbyStop[]>(() => {
+    if (!nearbyPlace) return [];
+    return loadRailStops()
+      .map(stop => ({ stop, distanceKm: distanceKm(nearbyPlace, stop) }))
+      .filter(item => item.distanceKm <= 1.5)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+  }, [nearbyPlace]);
 
   const selectStop = (stop: RailStop) => {
     reach.selectStop(stop);
@@ -36,8 +60,23 @@ export function MapPage({ onToast }: MapPageProps) {
 
   const selectPoint = (at: { lat: number; lon: number }) => {
     reach.selectPoint(at);
-    setSearchParams({}, { replace: true });
+    setNearbyPlace(null);
+    setSearchParams({ lat: String(at.lat), lon: String(at.lon) }, { replace: true });
   };
+
+  const selectSearchResult = (result: LocationSearchResult) => {
+    if (!isPlaceResult(result)) {
+      selectStop(result);
+      return;
+    }
+    reach.selectPlace(result);
+    setNearbyPlace(result);
+    setSearchParams({ lat: String(result.lat), lon: String(result.lon), name: result.name }, { replace: true });
+  };
+
+  const resultMetadata = reach.state.status === 'ready'
+    ? reach.state.result
+    : { departureLabel: getDepartureProfile(reach.departureProfile).label, timetableStatus: 'demo-fallback' as const };
 
   return (
     // top-16 rather than pt-16: an absolutely positioned child resolves inset-0 against
@@ -70,7 +109,7 @@ export function MapPage({ onToast }: MapPageProps) {
           {configOpen && (
             <div className="space-y-4 fade-in">
               <LocationSearch
-                onSelect={selectStop}
+                onSelect={selectSearchResult}
                 selected={reach.origin?.stop ?? null}
                 compact
               />
@@ -99,9 +138,11 @@ export function MapPage({ onToast }: MapPageProps) {
 
               {!reach.origin && (
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  搜索深圳地铁站，或直接点击地图选择出发点。
+                  搜索地点、小区或地铁站，或直接点击地图选择出发点。
                 </p>
               )}
+
+              {nearbyPlace && <NearbyStopsPanel place={nearbyPlace} stops={nearbyStops} onSelectStop={selectStop} />}
 
               <div>
                 <label className="text-xs font-semibold text-slate-500 mb-1.5 block">时间预算</label>
@@ -113,15 +154,21 @@ export function MapPage({ onToast }: MapPageProps) {
                 <DepartureTimeSelector value={reach.departureProfile} onChange={reach.changeDepartureProfile} />
               </div>
 
-              <BudgetCompositionNote />
-
-              <div className="pt-2 border-t border-slate-200/70">
-                <CoveredAreaNote />
-              </div>
+              <button onClick={() => setInfoOpen(true)} className="btn-secondary w-full inline-flex items-center justify-center gap-2 text-xs py-2.5">
+                <Info size={14} />
+                数据来源与模型说明
+              </button>
             </div>
           )}
         </div>
       </div>
+
+      <InfoModal
+        open={infoOpen}
+        onClose={() => setInfoOpen(false)}
+        departureLabel={resultMetadata.departureLabel}
+        timetableStatus={resultMetadata.timetableStatus}
+      />
     </div>
   );
 }
@@ -135,6 +182,7 @@ function OriginReadout({ origin }: { origin: NonNullable<ReturnType<typeof useRe
   const label =
     origin.source === 'stop' ? '已选地铁站'
     : origin.source === 'device' ? '我的位置'
+    : origin.source === 'place' ? '搜索地点'
     : '地图选点';
 
   return (
@@ -148,7 +196,10 @@ function OriginReadout({ origin }: { origin: NonNullable<ReturnType<typeof useRe
           </div>
         </>
       ) : (
-        <div className="text-sm font-mono text-slate-700">{formatCoord(origin.at)}</div>
+        <>
+          {origin.place && <div className="text-sm font-semibold text-slate-800">{origin.place.name}</div>}
+          <div className="text-sm font-mono text-slate-700">{formatCoord(origin.at)}</div>
+        </>
       )}
     </div>
   );
@@ -302,181 +353,6 @@ function ResultPanel({
         </div>
       )}
 
-      {/* AC 1.3.3 — the data basis accompanies a displayed result, and only a result. */}
-      {state.status === 'ready' && (
-        <DataBasisNote
-          departureLabel={state.result.departureLabel}
-          timetableStatus={state.result.timetableStatus}
-        />
-      )}
     </div>
-  );
-}
-
-/**
- * AC 1.3.3 — what the displayed result was computed from.
- *
- * Shown only alongside a drawn area, since it describes that result. Every value is read
- * from the feed metadata rather than written by hand, so it cannot drift from the data the
- * engine was actually built on. The OpenStreetMap attribution required by the same
- * criterion is Leaflet's own control on the map, which is not dismissible.
- */
-function DataBasisNote({
-  departureLabel,
-  timetableStatus,
-}: {
-  departureLabel: string;
-  timetableStatus: 'verified' | 'demo-fallback';
-}) {
-  const [open, setOpen] = useState(false);
-  const basis = getDataBasis();
-
-  return (
-    <div className="glass p-3.5 mt-3">
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-2 text-left"
-        aria-expanded={open}
-      >
-        <Database size={13} className="text-slate-500 shrink-0" />
-        <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">
-          数据与模型说明
-        </span>
-        <ChevronDown
-          size={14}
-          className="text-slate-400 shrink-0"
-          style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 200ms ease-out' }}
-        />
-      </button>
-
-      {/* Always visible, expanded or not: the scope of the result and its basis in time. */}
-      <div className="mt-2 space-y-1 text-[11px] leading-snug">
-        <div>
-          <span className="font-semibold text-slate-700">{basis.feedName}</span>
-          <span className="text-slate-500"> — {basis.lineCount} 条线路静态快照 + OSM 障碍物裁剪包络</span>
-        </div>
-        <div className="text-slate-600">
-          出发设置：{departureLabel}
-          {basis.activeCalendars.length > 0 && (
-            <span className="text-slate-400"> (calendar {basis.activeCalendars.join(', ')})</span>
-          )}
-        </div>
-        <div className="text-slate-600">
-          候车：{timetableStatus === 'verified' ? '授权时刻表的半个发车间隔估算。' : '官方时刻表未授权导入，固定按 4 分钟 Demo 估算。'}
-        </div>
-        <div className="text-slate-600">{basis.modesNotLoaded}</div>
-      </div>
-
-      {open && (
-        <div className="mt-2 pt-2 border-t border-slate-200/70 space-y-1.5 text-[11px] leading-snug fade-in">
-          <p className="text-slate-600">{basis.realtimeNote}</p>
-
-          {basis.expiredCalendars.length > 0 && (
-            <p className="text-slate-600">
-              <span className="font-semibold text-slate-700">Expired service excluded:</span>{' '}
-              the feed also contains{' '}
-              {basis.expiredCalendars.map(c => `${c.serviceId} (ended ${c.endDate})`).join(' and ')}.
-              No trip references {basis.expiredCalendars.length > 1 ? 'them' : 'it'}, and the graph
-              build bounds the service period, so no result is drawn from expired service.
-            </p>
-          )}
-
-          <p className="text-slate-600">
-            <span className="font-semibold text-slate-700">底图与站点坐标：</span> OpenStreetMap（ODbL）。
-            地图右下角持续显示署名。
-          </p>
-
-          <p className="text-slate-500">
-            <span className="font-semibold text-slate-600">数据许可：</span>{' '}
-            {basis.licence ?? basis.licenceStatus}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * AC 1.2.3 — what the travel time budget is spent on.
- *
- * Collapsed by default. The criterion is triggered by the user "viewing how the travel
- * time was arrived at", so putting it behind a labelled control is faithful to that and
- * keeps the panel readable — but everything it must disclose is still here, and no
- * component is dropped for being unmodelled.
- *
- * The wording is deliberately a rider's, not the project's: what counts against the
- * budget and what is missing from it, with no epic names or internal owners. Honesty
- * about the model is required; internal process vocabulary is not, and reads as an
- * unfinished note to anyone outside the team.
- */
-function BudgetCompositionNote() {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="glass-chip rounded-xl px-3 py-2.5">
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-2 text-left"
-        aria-expanded={open}
-      >
-        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide flex-1">
-          这段时间如何估算
-        </span>
-        <ChevronDown
-          size={14}
-          className="text-slate-400 shrink-0"
-          style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 200ms ease-out' }}
-        />
-      </button>
-
-      {open && (
-        <div className="fade-in">
-          <ul className="space-y-1.5 mt-2">
-            {BUDGET_COMPONENTS.map(component => (
-              <li key={component.label} className="text-[11px] leading-snug">
-                <span className="font-semibold text-slate-700">{component.label}</span>
-                {component.estimate && (
-                  <span className="ml-1.5 px-1 py-px rounded bg-amber-100 text-amber-800 font-semibold text-[10px] uppercase tracking-wide">
-                    Demo 估算
-                  </span>
-                )}
-                <div className="text-slate-500">{component.status}</div>
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-2 pt-2 border-t border-slate-200/70 space-y-1">
-            {BUDGET_ASSUMPTIONS.map(assumption => (
-              <div key={assumption.label} className="text-[11px] leading-snug">
-                <span className="font-semibold text-slate-700">{assumption.label}:</span>{' '}
-                <span className="text-slate-500">{assumption.status}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * What "covered area" means — the bound a map click is rejected against.
- *
- * The study-area boundary is not yet agreed: it depends on the extent of the bus feed,
- * which is not loaded. Rather than invent a boundary, it is derived from the rail network
- * actually loaded, and that basis is stated here so the reader can see what the limit is.
- *
- * Lives inside the configuration panel rather than floating over the map. As a separate
- * bottom-left box it collided with the panel above it once the travel-time disclosure was
- * expanded — two independently positioned overlays sharing one column will always be one
- * content change away from overlapping. Keeping it in the panel's flow removes the class
- * of bug rather than re-tuning heights.
- */
-function CoveredAreaNote() {
-  return (
-    <p className="text-[11px] text-slate-500 leading-relaxed">
-      <span className="font-semibold text-slate-600">可选范围：</span>
-      深圳市域 Demo 边界（按静态站点数据范围，外扩 {STUDY_AREA_BUFFER_KM} km）。公交、官方时刻表、实时班次及真实步行路网尚未参与当前计算。
-    </p>
   );
 }

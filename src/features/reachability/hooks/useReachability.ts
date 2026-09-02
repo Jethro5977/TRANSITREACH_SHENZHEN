@@ -5,7 +5,7 @@ import {
   type IsochroneResult,
 } from '@/shared/data/adapters/routingAdapter';
 import { DEFAULT_DEPARTURE_PROFILE, type DepartureProfileId } from '@/shared/data/shenzhen/timetable';
-import type { LatLng, Origin, RailStop } from '../types';
+import type { LatLng, Origin, PlaceResult, RailStop } from '../types';
 import { isInStudyArea } from '../reachabilityService';
 
 /** AC 1.1.2 — a click outside the covered area is rejected with this message. */
@@ -36,10 +36,15 @@ export type ReachabilityState =
 
 export function useReachability(
   initialStop: RailStop | null,
+  initialPlace: PlaceResult | null,
   onToast: (message: string, icon?: string) => void,
 ) {
   const [origin, setOrigin] = useState<Origin | null>(
-    initialStop ? { at: { lat: initialStop.lat, lon: initialStop.lon }, source: 'stop', stop: initialStop } : null,
+    initialStop
+      ? { at: { lat: initialStop.lat, lon: initialStop.lon }, source: 'stop', stop: initialStop }
+      : initialPlace
+        ? { at: initialPlace, source: 'place', place: initialPlace }
+        : null,
   );
   const [timeBudget, setTimeBudget] = useState(DEFAULT_TIME_BUDGET);
   const [departureProfile, setDepartureProfile] = useState<DepartureProfileId>(DEFAULT_DEPARTURE_PROFILE);
@@ -112,6 +117,15 @@ export function useReachability(
     setOrigin({ at, source: 'map' });
   };
 
+  /** A geocoded place remains a coordinate origin; it is never silently coerced to a station. */
+  const selectPlace = (place: PlaceResult) => {
+    if (!isInStudyArea(place)) {
+      onToast(OUTSIDE_AREA, '!');
+      return;
+    }
+    setOrigin({ at: place, source: 'place', place });
+  };
+
   /**
    * AC 1.1.4 — the permission is requested here and nowhere else, so nothing prompts on
    * page load. The position sets the origin directly, with no confirmation step. It is
@@ -154,6 +168,7 @@ export function useReachability(
     state,
     selectStop,
     selectPoint,
+    selectPlace,
     requestDeviceLocation,
     clearOrigin,
     changeTimeBudget,

@@ -2,7 +2,7 @@ import { AlertTriangle, BusFront, Clock3, Database, ExternalLink, Footprints, Ma
 import { SHENZHEN_TRANSIT_DATA_SOURCES, type TransitSourceStatus } from '@/shared/data/shenzhen/sources';
 
 const STEPS = [
-  { icon: MapPinned, title: '1. 选择深圳起点', text: '从静态地铁站快照中搜索，或点击地图任意深圳市域坐标。' },
+  { icon: MapPinned, title: '1. 选择深圳起点', text: '优先从静态地铁站快照中搜索；无站名匹配时可手动查询 OSM 地点，或点击地图任意深圳市域坐标。' },
   { icon: Footprints, title: '2. 估算首段步行', text: '以 4.8 km/h、最长 1.35 km 的直线接驳寻找附近站点，并生成带方向变化的步行包络。' },
   { icon: TrainFront, title: '3. 沿地铁走廊扩展', text: '按平均 34 km/h 估算车内时间，另计 4 分钟候车，并允许一次固定 4 分钟的换乘。' },
   { icon: Clock3, title: '4. 裁剪与合并区域', text: '将剩余时间转换为单站最多 1.2 km 的方向性包络，避开 OSM 水域和高速缓冲区后再合并；保留不连续区域和内部空洞。' },
