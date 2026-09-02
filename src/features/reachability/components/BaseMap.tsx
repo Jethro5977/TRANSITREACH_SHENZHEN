@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Polygon, Tooltip as LeafletTooltip, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { IsochroneRegion } from '@/shared/data/adapters/routingAdapter';
 import type { LatLng, Origin } from '../types';
 import { NETWORK_CENTRE } from '../reachabilityService';
-import { SHENZHEN_METRO_STOPS } from '@/shared/data/shenzhen/metro';
+import { SHENZHEN_METRO_LINES, SHENZHEN_METRO_STOPS } from '@/shared/data/shenzhen/metro';
 
 /**
  * OpenStreetMap raster tiles.
@@ -33,16 +33,27 @@ const ORIGIN_ZOOM = 15;
  */
 const FILL_OPACITY = 0.25;
 const AREA_COLOR = '#0d9488';
+const LINE_COLORS = new Map(SHENZHEN_METRO_LINES.map(line => [line.routeId, line.color]));
 
 function MetroStations() {
+  const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
+  useMapEvents({ zoomend: event => setZoom(event.target.getZoom()) });
+  const radius = zoom <= 11 ? 2.5 : zoom <= 13 ? 3.25 : 4;
+
   return (
     <>
       {SHENZHEN_METRO_STOPS.map(stop => (
         <CircleMarker
           key={stop.stopId}
           center={[stop.lat, stop.lon]}
-          radius={4}
-          pathOptions={{ color: '#ffffff', weight: 1.5, fillColor: '#2563eb', fillOpacity: 0.9 }}
+          radius={radius}
+          pathOptions={{
+            color: '#ffffff',
+            weight: stop.lines.length > 1 ? 1.8 : 1.1,
+            fillColor: LINE_COLORS.get(stop.lines[0]) ?? '#0d9488',
+            fillOpacity: zoom <= 11 ? 0.76 : 0.92,
+          }}
         >
           <LeafletTooltip direction="top" offset={[0, -5]}>
             <span className="font-semibold">{stop.name}</span>
@@ -181,22 +192,47 @@ function ReachabilityLayer({ regions }: { regions: IsochroneRegion[] }) {
 }
 
 export function BaseMap({ origin, regions, onMapClick }: BaseMapProps) {
+  const [tilesReady, setTilesReady] = useState(false);
+
+  useEffect(() => {
+    const fallback = window.setTimeout(() => setTilesReady(true), 8_000);
+    return () => window.clearTimeout(fallback);
+  }, []);
+
   return (
-    <MapContainer
-      center={[NETWORK_CENTRE.lat, NETWORK_CENTRE.lon]}
-      zoom={DEFAULT_ZOOM}
-      style={{ width: '100%', height: '100%' }}
-      zoomControl={false}
-    >
-      <TileLayer url={OSM_TILE_URL} attribution={OSM_ATTRIBUTION} maxZoom={19} />
-      {/* Must precede ViewController so the container size is correct before the view is set. */}
-      <ResizeHandler />
-      <ClickHandler onMapClick={onMapClick} />
-      <ViewController origin={origin} />
-      <MetroStations />
-      {/* The area is drawn first so the origin pin sits above the fill (AC 1.3.1). */}
-      {regions && <ReachabilityLayer regions={regions} />}
-      {origin && <OriginPin at={origin.at} />}
-    </MapContainer>
+    <div className="relative w-full h-full bg-slate-100">
+      <MapContainer
+        center={[NETWORK_CENTRE.lat, NETWORK_CENTRE.lon]}
+        zoom={DEFAULT_ZOOM}
+        style={{ width: '100%', height: '100%' }}
+        zoomControl={false}
+      >
+        <TileLayer
+          url={OSM_TILE_URL}
+          attribution={OSM_ATTRIBUTION}
+          maxZoom={19}
+          eventHandlers={{ load: () => setTilesReady(true) }}
+        />
+        {/* Must precede ViewController so the container size is correct before the view is set. */}
+        <ResizeHandler />
+        <ClickHandler onMapClick={onMapClick} />
+        <ViewController origin={origin} />
+        <MetroStations />
+        {/* The area is drawn first so the origin pin sits above the fill (AC 1.3.1). */}
+        {regions && <ReachabilityLayer regions={regions} />}
+        {origin && <OriginPin at={origin.at} />}
+      </MapContainer>
+      {!tilesReady && (
+        <div className="absolute inset-0 z-[650] flex items-center justify-center bg-slate-50/92 backdrop-blur-sm" role="status" aria-live="polite">
+          <div className="glass px-6 py-5 flex flex-col items-center gap-3 text-center shadow-xl">
+            <div className="w-9 h-9 rounded-full border-[3px] border-teal-100 border-t-teal-600 spinner" />
+            <div>
+              <p className="text-sm font-bold text-slate-800">正在加载深圳地图</p>
+              <p className="text-xs text-slate-500 mt-1">准备站点与开放地图底图…</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

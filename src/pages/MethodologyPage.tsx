@@ -45,9 +45,9 @@ export function MethodologyPage() {
           <div className="flex items-start gap-3">
             <AlertTriangle size={21} className="text-amber-700 mt-0.5 shrink-0" />
             <div>
-              <h2 className="font-bold text-amber-950 mb-2">正式上线前必须补齐</h2>
+              <h2 className="font-bold text-amber-950 mb-2">模型边界与后续数据工作</h2>
               <p className="text-sm text-amber-900/80 leading-relaxed">
-                完整深圳地铁 GTFS 或可验证时刻表、深圳 OSM 路网构建的 OTP 图、真实换乘与步行路径、公交数据、服务设施数据、实时状态与服务端压力测试。当前结果不可用于导航或公共决策。
+                后续仍需补充完整深圳地铁 GTFS 或可验证时刻表、真实换乘与步行路径、公交数据、实时状态及服务端压力测试。当前公开版本用于可达性概念探索，不可用于导航或公共决策。
               </p>
             </div>
           </div>

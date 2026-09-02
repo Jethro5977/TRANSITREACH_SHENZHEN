@@ -2,6 +2,10 @@
 import type { RailFeedMetadata, RailLine, RailStop } from '../adapters/gtfsAdapter';
 import snapshot from './stations.generated.json';
 
+export const SHENZHEN_DATA_SNAPSHOT_DATE = snapshot.generatedAt.slice(0, 10);
+const [snapshotYear, snapshotMonth] = SHENZHEN_DATA_SNAPSHOT_DATE.split('-');
+export const SHENZHEN_DATA_SNAPSHOT_LABEL = `${snapshotYear}年${Number(snapshotMonth)}月`;
+
 export const SHENZHEN_CENTRE = { lat: 22.5431, lon: 114.0579 };
 export const SHENZHEN_BOUNDS = { minLat: 22.43, maxLat: 22.82, minLon: 113.74, maxLon: 114.42 };
 

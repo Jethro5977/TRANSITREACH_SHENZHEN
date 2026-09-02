@@ -1,5 +1,5 @@
 /**
- * Local Shenzhen reachability estimator used by the China demo branch.
+ * Local reachability estimator used by the TransitReach Shenzhen public beta.
  *
  * This pure-front-end Shenzhen Demo combines a walking catchment with egress catchments
  * around stations reachable directly or with at most one sampled-line transfer.
@@ -27,6 +27,8 @@ export interface IsochroneResult {
 export interface ReachabilityComputation {
   result: IsochroneResult;
   walkingOnly: boolean;
+  /** Algorithm time only, excluding the one-frame UI yield. */
+  durationMs: number;
 }
 
 export class RoutingUnavailableError extends Error {
@@ -118,15 +120,10 @@ export async function computeReachability(
   budgetMinutes: number,
   signal: AbortSignal,
 ): Promise<ReachabilityComputation> {
-  await new Promise<void>((resolve, reject) => {
-    const timer = window.setTimeout(resolve, 280);
-    signal.addEventListener('abort', () => {
-      window.clearTimeout(timer);
-      reject(new DOMException('Aborted', 'AbortError'));
-    }, { once: true });
-  });
-
+  // Yield one frame so React can paint its computing state before synchronous geometry.
+  await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
   if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+  const startedAt = performance.now();
 
   const walkRadiusKm = (budgetMinutes / 60) * WALK_KMH;
   const circles: CircleCatchment[] = [{ ...origin, radiusKm: walkRadiusKm }];
@@ -134,6 +131,7 @@ export async function computeReachability(
   const accessStops = stops
     .map(stop => ({ stop, distance: distanceKm(origin, stop) }))
     .filter(item => item.distance <= MAX_ACCESS_KM);
+  const interchangeStops = stops.filter(stop => stop.lines.length >= 2);
 
   for (const access of accessStops) {
     const accessMinutes = (access.distance / WALK_KMH) * 60;
@@ -144,7 +142,7 @@ export async function computeReachability(
       journeyMinutes.set(destination.stopId, WAIT_MINUTES + (distanceKm(access.stop, destination) / METRO_KMH) * 60);
     }
 
-    for (const interchange of stops) {
+    for (const interchange of interchangeStops) {
       const firstLines = access.stop.lines.filter(line => interchange.lines.includes(line));
       if (firstLines.length === 0 || interchange.lines.length < 2) continue;
       const firstLegMinutes = WAIT_MINUTES + (distanceKm(access.stop, interchange) / METRO_KMH) * 60;
@@ -169,8 +167,13 @@ export async function computeReachability(
 
   const displayCircles = uniqueCircles(circles);
   const walkingOnly = displayCircles.length === 1;
+  const durationMs = performance.now() - startedAt;
+  if (import.meta.env.DEV) {
+    console.info(`[TransitReach] 可达范围计算 ${durationMs.toFixed(1)}ms (${budgetMinutes}min, ${displayCircles.length} regions)`);
+  }
   return {
     walkingOnly,
+    durationMs,
     result: {
       budgetMinutes,
       regions: displayCircles.map(circle => circleRegion(circle)),

@@ -1,5 +1,3 @@
-import { TRANSIT_LINES } from '@/shared/data';
-import { generateReachPolygon, mapAreaToKm2 } from '@/shared/data/mock/reachability';
 import { loadRailFeedMetadata } from '@/shared/data/adapters/gtfsAdapter';
 import {
   WALK_SPEED_MS,
@@ -7,8 +5,6 @@ import {
   DEPARTURE_TIME_LABEL,
   DEPARTURE_TIME_IS_PROVISIONAL,
 } from '@/shared/data/adapters/routingAdapter';
-import { polygonArea } from '@/shared/lib/spatial';
-import type { MapPoint } from '@/shared/types/location';
 import type { LatLng, RailStop } from './types';
 import { SHENZHEN_CENTRE } from '@/shared/data/shenzhen/metro';
 
@@ -230,15 +226,3 @@ export const BUDGET_ASSUMPTIONS = [
     status: `静态地铁站快照 + 步行估算。${MODES_NOT_LOADED}`,
   },
 ];
-
-export function calculatePrototypeReachability(origin: MapPoint, timeBudgetMinutes: number) {
-  const polygon = generateReachPolygon(origin, timeBudgetMinutes, 42);
-  return { polygon, areaKm2: mapAreaToKm2(polygonArea(polygon)) };
-}
-
-export function getHighlightedTransitLineIds(origin: MapPoint, enabled: boolean): string[] {
-  if (!enabled) return [];
-  return TRANSIT_LINES
-    .filter(line => line.stops.some(stop => Math.hypot(stop.pos.x - origin.x, stop.pos.y - origin.y) < 100))
-    .map(line => line.id);
-}

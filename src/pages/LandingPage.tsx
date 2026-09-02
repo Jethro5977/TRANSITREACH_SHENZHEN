@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ArrowRight, Building2, Clock3, Database, MapPin, Route, Sparkles, TrainFront } from 'lucide-react';
-import { LocationSearch, type RailStop } from '@/features/reachability';
-import { SHENZHEN_METRO_LINES, SHENZHEN_METRO_STOPS } from '@/shared/data/shenzhen/metro';
+import { LocationSearch } from '@/features/reachability/components/LocationSearch';
+import type { RailStop } from '@/features/reachability/types';
+import { SHENZHEN_DATA_SNAPSHOT_LABEL, SHENZHEN_METRO_LINES, SHENZHEN_METRO_STOPS } from '@/shared/data/shenzhen/metro';
 import { useNavigate } from 'react-router-dom';
 const FEATURED_STATIONS = ['深圳北', '福田', '车公庙', '前海湾', '岗厦北', '老街'];
 
@@ -22,7 +23,7 @@ export function LandingPage() {
           <div className="fade-slide-up">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-chip mb-6">
               <Sparkles size={14} className="text-teal-600" />
-              <span className="text-xs font-bold text-teal-700">深圳首发 · China Demo</span>
+              <span className="text-xs font-bold text-teal-700">深圳公共交通可达性工具</span>
             </div>
             <h1 className="text-4xl sm:text-6xl font-extrabold text-slate-900 leading-[1.05] tracking-tight mb-6">
               看见深圳地铁能把你带到的
@@ -65,8 +66,8 @@ export function LandingPage() {
                 <div className="text-2xl font-bold mt-2">30 分钟可达性快照</div>
               </div>
               <div className="absolute left-7 right-7 bottom-7 grid grid-cols-3 gap-3">
-                <Metric label="站点样本" value={`${SHENZHEN_METRO_STOPS.length}`} />
-                <Metric label="线路样本" value={`${SHENZHEN_METRO_LINES.length}`} />
+                <Metric label="覆盖站点" value={`${SHENZHEN_METRO_STOPS.length}`} />
+                <Metric label="覆盖线路" value={`${SHENZHEN_METRO_LINES.length}`} />
                 <Metric label="默认预算" value="30 min" />
               </div>
             </div>
@@ -80,12 +81,12 @@ export function LandingPage() {
             <InfoCard icon={MapPin} title="地图自由选点" text="站点搜索或地图点击均可设为起点。" />
             <InfoCard icon={Clock3} title="四档时间预算" text="快速对比 15、30、45、60 分钟范围。" />
             <InfoCard icon={TrainFront} title="深圳轨道快照" text="包含 266 个 OSM 去重站点与 11 条线路关系。" />
-            <InfoCard icon={Database} title="来源透明" text="开放地图坐标与 Demo 假设在结果旁说明。" />
+            <InfoCard icon={Database} title="来源透明" text={`开放地图坐标与模型假设持续说明 · 数据快照 ${SHENZHEN_DATA_SNAPSHOT_LABEL}。`} />
           </div>
           <div className="mt-6 glass p-5 flex gap-3 items-start border border-amber-200/70">
             <Building2 size={19} className="text-amber-600 mt-0.5 shrink-0" />
             <p className="text-sm text-slate-600 leading-relaxed">
-              <strong className="text-slate-800">本页面是本地产品 Demo。</strong>
+              <strong className="text-slate-800">本工具仍属于交互原型（Demo）。</strong>
               当前范围使用启发式速度模型，最多模拟一次换乘；不含完整时刻表、道路步行网络或实时运营信息，不可用于实际导航。
             </p>
           </div>

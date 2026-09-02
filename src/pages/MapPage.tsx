@@ -1,14 +1,11 @@
 import { useState } from 'react';
 import { AlertTriangle, ChevronDown, Clock, Crosshair, Database, Footprints, Loader2, Maximize2, Minimize2, RotateCw, X } from 'lucide-react';
 import { Tooltip } from '@/shared/ui';
-import {
-  BaseMap,
-  LocationSearch,
-  TimeBudgetSelector,
-  useReachability,
-  type RailStop,
-  type ReachabilityState,
-} from '@/features/reachability';
+import { BaseMap } from '@/features/reachability/components/BaseMap';
+import { LocationSearch } from '@/features/reachability/components/LocationSearch';
+import { TimeBudgetSelector } from '@/features/reachability/components/TimeBudgetSelector';
+import { useReachability, type ReachabilityState } from '@/features/reachability/hooks/useReachability';
+import type { RailStop } from '@/features/reachability/types';
 import {
   formatCoord,
   STUDY_AREA_BUFFER_KM,
