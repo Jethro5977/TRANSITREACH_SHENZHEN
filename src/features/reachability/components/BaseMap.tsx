@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
-import L from 'leaflet';
 import { MapContainer, TileLayer, CircleMarker, Polygon, Tooltip as LeafletTooltip, useMap, useMapEvents } from 'react-leaflet';
-import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet/dist/leaflet.css';
-import 'react-leaflet-cluster/dist/assets/MarkerCluster.css';
 import type { IsochroneRegion } from '@/shared/data/adapters/routingAdapter';
 import type { LatLng, Origin } from '../types';
 import { NETWORK_CENTRE } from '../reachabilityService';
@@ -40,62 +37,49 @@ const FILL_OPACITY = 0.2;
 const AREA_COLOR = '#0d9488';
 const LINE_COLORS = new Map(SHENZHEN_METRO_LINES.map(line => [line.routeId, line.color]));
 
-/**
- * Cluster count is part of the visual hierarchy: a group of three must not occupy
- * the same screen area as a dense interchange corridor. The CSS classes own the
- * rendered diameter while Leaflet receives a slightly larger hit box.
- */
-function createClusterIcon(cluster: L.MarkerCluster) {
-  const count = cluster.getChildCount();
-  const size = count <= 3 ? 24 : count <= 8 ? 30 : 36;
-  const sizeClass = count <= 3 ? 'cluster-sm' : count <= 8 ? 'cluster-md' : 'cluster-lg';
-
-  return L.divIcon({
-    html: `<span>${count}</span>`,
-    className: `transit-station-cluster ${sizeClass}`,
-    iconSize: L.point(size, size, true),
-  });
-}
-
-function MetroStations() {
+/** Fixed rail stations reveal progressively; they are not random POIs to be clustered. */
+function MetroStations({ reachableStopIds }: { reachableStopIds?: ReadonlySet<string> }) {
   const map = useMap();
   const [zoom, setZoom] = useState(map.getZoom());
   useMapEvents({ zoomend: event => setZoom(event.target.getZoom()) });
-  const radius = zoom <= 11 ? 2.5 : zoom <= 13 ? 3.25 : 4;
+
+  // At city scale, hide network detail; at district scale, preserve the route-colour pattern.
+  if (zoom <= 10) return null;
+
+  const radius = zoom <= 12 ? 3 : zoom <= 13 ? 4 : 5;
+  const weight = zoom <= 12 ? 0.8 : 1.2;
+  const baseOpacity = zoom <= 12 ? 0.7 : 0.9;
+  const showTooltip = zoom >= 13;
 
   return (
-    <MarkerClusterGroup
-      chunkedLoading
-      maxClusterRadius={28}
-      disableClusteringAtZoom={13}
-      spiderfyOnMaxZoom={false}
-      showCoverageOnHover={false}
-      iconCreateFunction={createClusterIcon}
-      animate
-      animateAddingMarkers={false}
-    >
+    <>
       {SHENZHEN_METRO_STOPS.map(stop => {
         const isInterchange = stop.lines.length > 1;
+        const isReachable = reachableStopIds?.has(stop.stopId) ?? false;
+        const lineColor = LINE_COLORS.get(stop.lines[0]) ?? '#0d9488';
+
         return (
           <CircleMarker
             key={stop.stopId}
             center={[stop.lat, stop.lon]}
-            radius={radius}
+            radius={isReachable ? radius + 1.5 : (isInterchange ? radius + 1 : radius)}
             pathOptions={{
-              color: isInterchange ? '#0f766e' : '#ffffff',
-              weight: isInterchange ? 2.2 : 1.1,
-              fillColor: isInterchange ? '#ffffff' : (LINE_COLORS.get(stop.lines[0]) ?? '#0d9488'),
-              fillOpacity: isInterchange ? 1 : (zoom <= 11 ? 0.76 : 0.92),
+              color: isInterchange ? '#0f766e' : (zoom <= 12 ? lineColor : '#ffffff'),
+              weight: isInterchange ? 1.8 : weight,
+              fillColor: isInterchange ? '#ffffff' : lineColor,
+              fillOpacity: isReachable ? 1 : (reachableStopIds ? baseOpacity * 0.6 : baseOpacity),
             }}
           >
-            <LeafletTooltip direction="top" offset={[0, -5]}>
-              <span className="font-semibold">{stop.name}</span>
-              <span className="text-slate-500"> · {stop.lines.join('/')}号线</span>
-            </LeafletTooltip>
+            {showTooltip && (
+              <LeafletTooltip direction="top" offset={[0, -5]}>
+                <span className="font-semibold">{stop.name}</span>
+                <span className="text-slate-500"> · {stop.lines.join('/')}号线</span>
+              </LeafletTooltip>
+            )}
           </CircleMarker>
         );
       })}
-    </MarkerClusterGroup>
+    </>
   );
 }
 
@@ -103,6 +87,8 @@ interface BaseMapProps {
   origin: Origin | null;
   /** Disjoint reachable regions, or null when there is nothing to draw. */
   regions: IsochroneRegion[] | null;
+  /** Station ids computed within the current time budget; omitted before a calculation. */
+  reachableStopIds?: ReadonlySet<string>;
   onMapClick: (at: LatLng) => void;
   theme: 'light' | 'dark';
 }
@@ -248,7 +234,7 @@ function ReachabilityLayer({ regions }: { regions: IsochroneRegion[] }) {
   );
 }
 
-export function BaseMap({ origin, regions, onMapClick, theme }: BaseMapProps) {
+export function BaseMap({ origin, regions, reachableStopIds, onMapClick, theme }: BaseMapProps) {
   const [tilesReady, setTilesReady] = useState(false);
 
   useEffect(() => {
@@ -276,7 +262,7 @@ export function BaseMap({ origin, regions, onMapClick, theme }: BaseMapProps) {
         <ClickHandler onMapClick={onMapClick} />
         <ViewController origin={origin} />
         <ReachabilityView regions={regions} />
-        <MetroStations />
+        <MetroStations reachableStopIds={reachableStopIds} />
         {/* The area is drawn first so the origin pin sits above the fill (AC 1.3.1). */}
         {regions && <ReachabilityLayer regions={regions} />}
         {origin && <OriginPin at={origin.at} />}

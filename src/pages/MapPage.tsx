@@ -45,6 +45,11 @@ export function MapPage({ onToast }: MapPageProps) {
   const [mapTheme, setMapTheme] = useState<'light' | 'dark'>('light');
   const [nearbyPlace, setNearbyPlace] = useState<PlaceResult | null>(initialPlace);
   const reach = useReachability(initialLocation, initialPlace, onToast);
+  const reachableStopIds = useMemo(() => (
+    reach.state.status === 'ready'
+      ? new Set(reach.state.result.reachableStations.map(({ stop }) => stop.stopId))
+      : undefined
+  ), [reach.state]);
 
   const nearbyStops = useMemo<NearbyStop[]>(() => {
     if (!nearbyPlace) return [];
@@ -87,6 +92,7 @@ export function MapPage({ onToast }: MapPageProps) {
         <BaseMap
           origin={reach.origin}
           regions={reach.state.status === 'ready' ? reach.state.result.regions : null}
+          reachableStopIds={reachableStopIds}
           onMapClick={selectPoint}
           theme={mapTheme}
         />
