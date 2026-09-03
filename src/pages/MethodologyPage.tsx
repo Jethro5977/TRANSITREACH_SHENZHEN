@@ -3,9 +3,9 @@ import { SHENZHEN_TRANSIT_DATA_SOURCES, type TransitSourceStatus } from '@/share
 
 const STEPS = [
   { icon: MapPinned, title: '1. 选择深圳起点', text: '优先从静态地铁站快照中搜索；无站名匹配时可手动查询 OSM 地点，或点击地图任意深圳市域坐标。' },
-  { icon: Footprints, title: '2. 估算首段步行', text: '以 4.8 km/h、最长 1.35 km 的直线接驳寻找附近站点，并生成带方向变化的步行包络。' },
+  { icon: Footprints, title: '2. 估算首段步行', text: '以 4.8 km/h、最长 1.35 km 的直线接驳寻找附近站点，并生成带方向变化、山峰方向近似衰减的步行包络。' },
   { icon: TrainFront, title: '3. 沿地铁走廊扩展', text: '按平均 34 km/h 估算车内时间，另计 4 分钟候车，并允许一次固定 4 分钟的换乘。' },
-  { icon: Clock3, title: '4. 裁剪与合并区域', text: '将剩余时间转换为单站最多 1.2 km 的方向性包络，避开 OSM 水域和高速缓冲区后再合并；保留不连续区域和内部空洞。' },
+  { icon: Clock3, title: '4. 裁剪与合并区域', text: '将剩余时间转换为单站最多 1.2 km 的方向性包络，避开 OSM 水域、快速路、铁路、悬崖/山脊和封闭区后再合并；保留不连续区域和内部空洞。' },
 ];
 
 export function MethodologyPage() {
@@ -38,7 +38,7 @@ export function MethodologyPage() {
           <ul className="space-y-3 text-sm text-slate-600 leading-relaxed">
             <li><strong className="text-slate-800">底图与站点坐标：</strong>OpenStreetMap / Overpass，2026-09-02 获取并去重的 266 站静态快照，遵循 ODbL 并在地图持续署名。</li>
             <li><strong className="text-slate-800">线路名称：</strong>以深圳市交通运输局与深圳地铁公开线路信息校对。</li>
-            <li><strong className="text-slate-800">边界几何：</strong>重叠站点包络使用 polygon union 合并，并以 OSM 水域、河渠及高速公路缓冲区裁剪，输出不规则 Polygon/MultiPolygon。</li>
+            <li><strong className="text-slate-800">边界几何：</strong>重叠站点包络使用 polygon union 合并，并以 OSM 水域、河渠、快速路、地面铁路、悬崖/山脊及军事封闭区缓冲裁剪；另按 OSM 山峰节点做方向性近似衰减，输出不规则 Polygon/MultiPolygon。</li>
             <li><strong className="text-slate-800">模型参数：</strong>步行 4.8 km/h、地铁平均 34 km/h、候车 4 分钟、一次换乘 4 分钟，均为交互原型假设，不是运营方发布指标。</li>
           </ul>
         </section>

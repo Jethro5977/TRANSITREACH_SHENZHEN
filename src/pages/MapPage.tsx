@@ -312,7 +312,7 @@ function ResultPanel({
 
           {/* AC 1.3.1 — the boundary is modelled, not a surveyed line. */}
           <p className="text-[11px] text-slate-400 leading-snug mt-2 pt-2 border-t border-slate-200/70">
-            重叠站点包络会避开 OSM 水域与高速缓冲区；仍未使用完整步行道路图，并非精确导航结果。
+            重叠站点包络会避开 OSM 水域、快速路、铁路与封闭区，并对山峰方向作近似衰减；仍未使用完整步行道路图，并非精确导航结果。
           </p>
 
           <div className="mt-3 pt-3 border-t border-slate-200/70">

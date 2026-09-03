@@ -124,7 +124,7 @@ export function LandingPage() {
             <Building2 size={19} className="text-amber-600 mt-0.5 shrink-0" />
             <p className="text-sm text-slate-600 leading-relaxed">
               <strong className="text-slate-800">本工具仍属于交互原型（Demo）。</strong>
-              当前范围使用启发式速度模型，并会避开 OSM 水域与高速缓冲区，最多模拟一次换乘；公交、完整时刻表、完整步行道路网络及实时运营信息尚未参与计算，不可用于实际导航。
+              当前范围使用启发式速度模型，避开 OSM 水域、快速路、铁路与封闭区，并对山峰方向作近似衰减，最多模拟一次换乘；公交、完整时刻表、完整步行道路网络及实时运营信息尚未参与计算，不可用于实际导航。
             </p>
           </div>
         </div>

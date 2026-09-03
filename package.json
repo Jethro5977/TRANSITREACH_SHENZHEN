@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "data:metro": "node scripts/build-shenzhen-metro.mjs",
     "data:barriers": "node scripts/build-shenzhen-barriers.mjs",
+    "data:peaks": "node scripts/build-shenzhen-peaks.mjs",
     "data:timetable": "node scripts/build-shenzhen-timetable.mjs"
   },
   "dependencies": {

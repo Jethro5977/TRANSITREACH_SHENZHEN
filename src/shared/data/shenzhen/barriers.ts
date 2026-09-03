@@ -1,4 +1,4 @@
-export type BarrierKind = 'water' | 'waterway' | 'motorway';
+export type BarrierKind = 'water' | 'waterway' | 'motorway' | 'trunk' | 'railway' | 'cliff' | 'military';
 export type BarrierRing = [number, number][];
 
 interface BarrierSnapshot {
@@ -6,7 +6,8 @@ interface BarrierSnapshot {
   source: string;
   licence: string;
   notes: string;
-  barriers: Record<BarrierKind, BarrierRing[][]>;
+  // Some OSM snapshots may legitimately have no feature for a particular kind.
+  barriers: Partial<Record<BarrierKind, BarrierRing[][]>>;
 }
 
 interface BoundedBarrier {
@@ -23,7 +24,7 @@ let loadingBarriers: Promise<BoundedBarrier[]> | null = null;
 async function loadBarrierBounds(): Promise<BoundedBarrier[]> {
   if (cachedBarriers) return cachedBarriers;
   if (loadingBarriers) return loadingBarriers;
-  // Kept out of the map route's initial chunk: this 943 KB OSM snapshot is only needed
+  // Kept out of the map route's initial chunk: this OSM snapshot is only needed
   // after the user actually requests an isochrone.
   loadingBarriers = import('./barriers.generated.json').then(module => {
     const snapshot = module.default as unknown as BarrierSnapshot;

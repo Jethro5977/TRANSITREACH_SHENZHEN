@@ -179,7 +179,7 @@ export const BUDGET_COMPONENTS: BudgetComponent[] = [
   {
     label: '步行到首个地铁站',
     modelled: true,
-    status: `按 ${WALK_SPEED_KMH} km/h 估算；使用方向性包络，并避开 OSM 水域与高速缓冲区；尚未接入完整步行路网。`,
+    status: `按 ${WALK_SPEED_KMH} km/h 估算；使用方向性包络，避开 OSM 水域、快速路、铁路与封闭区，并对山峰方向作近似衰减；尚未接入完整步行路网。`,
   },
   {
     label: '候车时间',

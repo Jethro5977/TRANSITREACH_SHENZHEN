@@ -8,6 +8,7 @@
 
 import polygonClipping, { type MultiPolygon, type Polygon as ClippingPolygon } from 'polygon-clipping';
 import { getIntersectingBarrierPolygons, preloadBarrierData } from '../shenzhen/barriers';
+import { SHENZHEN_PEAKS } from '../shenzhen/peaks.generated';
 import {
   getDepartureProfile,
   getWaitMinutes,
@@ -89,10 +90,40 @@ function distanceKm(a: { lat: number; lon: number }, b: { lat: number; lon: numb
  * Builds a deterministic, anisotropic walking envelope.
  *
  * This is intentionally not a perfect circle: real walking catchments are constrained
- * by blocks, entrances and the street mesh. Until an OSM pedestrian graph is deployed,
- * the alternating radii make that uncertainty visible instead of suggesting impossible
- * radial precision. It remains a heuristic and is labelled as such in the UI.
+ * by blocks, entrances, the street mesh and Shenzhen's terrain. Until an OSM pedestrian
+ * graph is deployed, this applies only a directional terrain approximation and remains
+ * explicitly labelled as a heuristic in the UI.
  */
+function terrainFactor(origin: CircleCatchment, angle: number): number {
+  const checkDistanceKm = Math.min(2, Math.max(0.9, origin.radiusKm * 1.5));
+  let minimumFactor = 1;
+
+  for (const peak of SHENZHEN_PEAKS) {
+    const distanceToPeak = distanceKm(origin, peak);
+    if (distanceToPeak > checkDistanceKm * 1.5) continue;
+
+    const peakAngle = Math.atan2(
+      (peak.lat - origin.lat) * EARTH_KM_PER_DEG_LAT,
+      (peak.lon - origin.lon) * kmPerDegLon(origin.lat),
+    );
+    const rawDifference = Math.abs(angle - peakAngle);
+    const angleDifference = Math.min(rawDifference, Math.PI * 2 - rawDifference);
+    const halfCone = Math.PI / 4;
+    if (angleDifference >= halfCone) continue;
+
+    const proximity = Math.max(0.3, Math.min(1, distanceToPeak / checkDistanceKm));
+    const directionOffset = angleDifference / halfCone;
+    // Never infer elevation: an omitted OSM `ele` tag gets only a conservative peak penalty.
+    const heightPenalty = peak.elevationM === undefined
+      ? 0.12
+      : Math.min(0.5, Math.max(0.1, (peak.elevationM - 50) / 800));
+    const factor = proximity + directionOffset * 0.28 + (1 - heightPenalty) * 0.18;
+    minimumFactor = Math.min(minimumFactor, factor);
+  }
+
+  return Math.max(0.25, Math.min(1, minimumFactor));
+}
+
 function catchmentRegion(circle: CircleCatchment, points = 24): IsochroneRegion {
   const ring: [number, number][] = [];
   const seed = Math.abs(Math.sin(circle.lat * 91.7 + circle.lon * 47.3));
@@ -100,13 +131,23 @@ function catchmentRegion(circle: CircleCatchment, points = 24): IsochroneRegion 
     const angle = (i / points) * Math.PI * 2;
     const blockBias = 0.82 + 0.13 * Math.abs(Math.cos(angle * 2 + seed));
     const streetVariation = 0.88 + 0.1 * Math.sin(angle * 5 + seed * 8) + 0.05 * Math.cos(angle * 3 - seed * 4);
-    const radiusKm = circle.radiusKm * Math.max(0.68, Math.min(1.04, blockBias * streetVariation));
+    const terrain = terrainFactor(circle, angle);
+    const radiusKm = circle.radiusKm * Math.max(0.2, Math.min(1.04, blockBias * streetVariation * terrain));
     const lat = circle.lat + Math.sin(angle) * radiusKm / EARTH_KM_PER_DEG_LAT;
     const lon = circle.lon + Math.cos(angle) * radiusKm / kmPerDegLon(circle.lat);
     ring.push([lon, lat]);
   }
   return { outer: ring, holes: [] };
 }
+
+type CatchmentStrategy = (circle: CircleCatchment) => IsochroneRegion;
+
+/**
+ * Replace this strategy with a walk-network Dijkstra/OTP implementation once a
+ * pedestrian graph is deployed. The current strategy is intentionally heuristic.
+ */
+const heuristicCatchment: CatchmentStrategy = circle => catchmentRegion(circle);
+const activeCatchment: CatchmentStrategy = heuristicCatchment;
 
 function regionsFromMultiPolygon(geometry: MultiPolygon): IsochroneRegion[] {
   return geometry.flatMap(polygon => {
@@ -123,15 +164,16 @@ function regionsFromMultiPolygon(geometry: MultiPolygon): IsochroneRegion[] {
 
 function mergeCatchments(circles: CircleCatchment[]): IsochroneRegion[] {
   if (circles.length === 0) return [];
-  const polygons: ClippingPolygon[] = circles.map(circle => [catchmentRegion(circle).outer]);
+  const polygons: ClippingPolygon[] = circles.map(circle => [activeCatchment(circle).outer]);
   const merged: MultiPolygon = polygonClipping.union(polygons[0], ...polygons.slice(1));
   return regionsFromMultiPolygon(merged);
 }
 
 /**
- * OSM water and motorway buffers remove clearly non-walkable ground from each local
- * envelope. This is a barrier-clipped heuristic, not a substitute for a pedestrian
- * routing graph; each region only considers barriers overlapping its own bounds.
+ * OSM water, controlled-access roads, railways, cliffs and military buffers remove
+ * clearly non-walkable ground from each local envelope. This is a barrier-clipped
+ * heuristic, not a substitute for a pedestrian routing graph; each region only
+ * considers barriers overlapping its own bounds.
  */
 async function clipRegionsByBarriers(regions: IsochroneRegion[]): Promise<IsochroneRegion[]> {
   const clipped = await Promise.all(regions.map(async region => {

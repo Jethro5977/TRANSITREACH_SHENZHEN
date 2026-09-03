@@ -5,11 +5,28 @@ import { buffer, cleanCoords, lineString, polygon, simplify } from '@turf/turf';
 
 const endpoint = process.env.OVERPASS_URL ?? 'https://overpass-api.de/api/interpreter';
 const bounds = '22.43,113.74,22.82,114.42';
-const query = `[out:json][timeout:120];
+const MAX_SNAPSHOT_BYTES = 1_500_000;
+const bufferKmByKind = {
+  water: 0,
+  waterway: 0.025,
+  motorway: 0.018,
+  trunk: 0.012,
+  railway: 0.015,
+  cliff: 0.008,
+  military: 0,
+};
+
+const query = `[out:json][timeout:180];
 (
   way["natural"="water"](${bounds});
   way["waterway"~"^(river|canal)$"](${bounds});
   way["highway"~"^(motorway|motorway_link)$"](${bounds});
+  way["highway"~"^(trunk|trunk_link)$"](${bounds});
+  way["railway"~"^(rail|light_rail|subway)$"]["service"!="spur"]["service"!="yard"]["tunnel"!="yes"](${bounds});
+  way["natural"~"^(cliff|ridge)$"](${bounds});
+  relation["natural"="water"](${bounds});
+  way["landuse"="military"](${bounds});
+  relation["landuse"="military"](${bounds});
 );
 out geom;`;
 
@@ -24,6 +41,59 @@ function isClosed(coords) {
   const first = coords[0];
   const last = coords.at(-1);
   return first[0] === last[0] && first[1] === last[1];
+}
+
+function samePoint(a, b) {
+  return a[0] === b[0] && a[1] === b[1];
+}
+
+/** Join outer member ways returned by `out geom` for a simple multipolygon relation. */
+function joinRelationOuterRings(element) {
+  const members = (element.members ?? [])
+    .filter(member => (member.role === 'outer' || member.role === '') && Array.isArray(member.geometry))
+    .map(member => member.geometry.map(point => [point.lon, point.lat]))
+    .filter(coords => coords.length >= 2);
+  const rings = [];
+  while (members.length > 0) {
+    let ring = members.pop();
+    let extended = true;
+    while (extended && !isClosed(ring)) {
+      extended = false;
+      for (let index = members.length - 1; index >= 0; index -= 1) {
+        const candidate = members[index];
+        const first = ring[0];
+        const last = ring.at(-1);
+        const candidateFirst = candidate[0];
+        const candidateLast = candidate.at(-1);
+        if (samePoint(last, candidateFirst)) {
+          ring = [...ring, ...candidate.slice(1)];
+        } else if (samePoint(last, candidateLast)) {
+          ring = [...ring, ...candidate.slice(0, -1).reverse()];
+        } else if (samePoint(first, candidateLast)) {
+          ring = [...candidate.slice(0, -1), ...ring];
+        } else if (samePoint(first, candidateFirst)) {
+          ring = [...candidate.slice(1).reverse(), ...ring];
+        } else {
+          continue;
+        }
+        members.splice(index, 1);
+        extended = true;
+        break;
+      }
+    }
+    if (isClosed(ring)) rings.push(ring);
+  }
+  return rings;
+}
+
+function barrierKind(tags) {
+  if (tags.landuse === 'military') return 'military';
+  if (/^(rail|light_rail|subway)$/.test(tags.railway ?? '')) return 'railway';
+  if (/^(motorway|motorway_link)$/.test(tags.highway ?? '')) return 'motorway';
+  if (/^(trunk|trunk_link)$/.test(tags.highway ?? '')) return 'trunk';
+  if (/^(cliff|ridge)$/.test(tags.natural ?? '')) return 'cliff';
+  if (tags.natural === 'water') return 'water';
+  return 'waterway';
 }
 
 function roundedRing(ring) {
@@ -54,19 +124,29 @@ function collectPolygons(feature, tolerance) {
 
 const sourceFeatures = [];
 for (const element of data.elements ?? []) {
-  if (!Array.isArray(element.geometry) || element.geometry.length < 2) continue;
-  const coords = element.geometry.map(point => [point.lon, point.lat]);
   const tags = element.tags ?? {};
-  const kind = tags.highway ? 'motorway' : tags.natural === 'water' ? 'water' : 'waterway';
-  try {
-    sourceFeatures.push({
-      kind,
-      feature: kind === 'water' && isClosed(coords)
-        ? polygon([coords])
-        : buffer(lineString(coords), kind === 'motorway' ? 0.018 : 0.025, { units: 'kilometers', steps: 2 }),
-    });
-  } catch {
-    // A malformed OSM way is ignored; the source query remains reproducible and logged.
+  const kind = barrierKind(tags);
+  const coordinateSets = element.type === 'relation'
+    ? joinRelationOuterRings(element)
+    : Array.isArray(element.geometry)
+      ? [element.geometry.map(point => [point.lon, point.lat])]
+      : [];
+  for (const coords of coordinateSets) {
+    if (coords.length < 2) continue;
+    try {
+      const isArea = (kind === 'water' || kind === 'military') && isClosed(coords);
+      // Open natural-water ways are rare; handle them as a narrow waterway rather
+      // than asking Turf to produce a zero-width line polygon.
+      const lineBufferKm = bufferKmByKind[kind] || (kind === 'water' ? bufferKmByKind.waterway : 0.015);
+      sourceFeatures.push({
+        kind,
+        feature: isArea
+          ? polygon([coords])
+          : buffer(lineString(coords), lineBufferKm, { units: 'kilometers', steps: 2 }),
+      });
+    } catch {
+      // A malformed OSM geometry is ignored; the source query remains reproducible and logged.
+    }
   }
 }
 
@@ -86,7 +166,7 @@ function groupBarriers(barriers) {
 let outputData;
 let serialized;
 let bytes;
-for (const tolerance of [0.00006, 0.00012, 0.00024, 0.00048, 0.001, 0.002]) {
+for (const tolerance of [0.00006, 0.00012, 0.00024, 0.00048, 0.001, 0.002, 0.003, 0.004]) {
   const barriers = buildBarriers(tolerance);
   if (barriers.length === 0) continue;
   outputData = {
@@ -95,7 +175,7 @@ for (const tolerance of [0.00006, 0.00012, 0.00024, 0.00048, 0.001, 0.002]) {
     licence: 'ODbL',
     query,
     simplificationToleranceDegrees: tolerance,
-    notes: 'OSM water, rivers/canals and motorway buffers. A routing heuristic clips these barriers; this is not a full pedestrian graph.',
+    notes: 'OSM water, rivers/canals, motorway/trunk, rail, cliff/ridge and military barriers. A routing heuristic clips these barriers; this is not a full pedestrian graph.',
     barriers: groupBarriers(barriers),
   };
   serialized = `${JSON.stringify(outputData)}\n`;
@@ -105,10 +185,10 @@ for (const tolerance of [0.00006, 0.00012, 0.00024, 0.00048, 0.001, 0.002]) {
     return counts;
   }, {});
   console.log(`candidate ${tolerance}: ${barriers.length} barriers, ${(bytes / 1024).toFixed(1)} KB`, kindCounts);
-  if (bytes <= 1_000_000) break;
+  if (bytes <= MAX_SNAPSHOT_BYTES) break;
 }
-if (!outputData || !serialized || !bytes || bytes > 1_000_000) {
-  throw new Error('Barrier snapshot remains above the 1 MB limit after simplification.');
+if (!outputData || !serialized || !bytes || bytes > MAX_SNAPSHOT_BYTES) {
+  throw new Error('Barrier snapshot remains above the 1.5 MB limit after simplification.');
 }
 
 const output = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/shared/data/shenzhen/barriers.generated.json');
