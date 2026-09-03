@@ -1,10 +1,10 @@
-import { useState, type CSSProperties, type PointerEvent } from 'react';
+import { useEffect, useState, type CSSProperties, type PointerEvent } from 'react';
 import { AlertTriangle, ArrowRight, Building2, Check, Clock3, Database, MapPin, Route, Sparkles, TrainFront, type LucideIcon } from 'lucide-react';
 import { LocationSearch, type LocationSearchResult } from '@/features/reachability/components/LocationSearch';
 import { isPlaceResult, type RailStop } from '@/features/reachability/types';
 import { SHENZHEN_DATA_SNAPSHOT_LABEL, SHENZHEN_METRO_LINES, SHENZHEN_METRO_STOPS } from '@/shared/data/shenzhen/metro';
 import { useNavigate } from 'react-router-dom';
-import { useCountUp, useScrollReveal } from '@/shared/hooks';
+import { useCountUp } from '@/shared/hooks';
 const FEATURED_STATIONS = ['深圳北', '福田', '车公庙', '前海湾', '岗厦北', '老街'];
 
 export function LandingPage() {
@@ -134,10 +134,19 @@ export function LandingPage() {
 }
 
 function Metric({ label, value, suffix = '', delay = 0 }: { label: string; value: number; suffix?: string; delay?: number }) {
-  const { ref, visible } = useScrollReveal<HTMLDivElement>();
-  const displayed = useCountUp(visible ? value : 0, 760, delay);
+  // The hero card is above the fold. A mount delay is more reliable than observing
+  // a child inside its overflow-hidden visual frame.
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(true), 300 + delay);
+    return () => window.clearTimeout(timer);
+  }, [delay]);
+
+  const displayed = useCountUp(visible ? value : 0, 760, 0);
+
   return (
-    <div ref={ref} className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur px-4 py-3 text-white">
+    <div className="rounded-2xl border border-white/10 bg-white/10 backdrop-blur px-4 py-3 text-white">
       <div className="text-[10px] uppercase tracking-wider text-slate-400">{label}</div>
       <div className="font-bold text-xl mt-1">{Math.round(displayed)}{suffix}</div>
     </div>

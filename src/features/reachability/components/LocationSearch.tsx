@@ -169,6 +169,9 @@ export function LocationSearch({ onSelect, selected, compact = false }: Location
                 <button
                   key={stop.stopId}
                   onMouseEnter={() => setHighlightedIdx(idx)}
+                  // Preserve input focus until click runs. This prevents the blur timeout
+                  // from closing a result list while a station is being selected.
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => handleSelect(stop)}
                   className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${highlightedIdx === idx ? 'bg-teal-50' : 'hover:bg-slate-50'}`}
                 >
@@ -186,7 +189,12 @@ export function LocationSearch({ onSelect, selected, compact = false }: Location
             <div>
               <p className="px-3 pt-1.5 pb-1 text-[10px] font-bold tracking-wide text-slate-500">地点（OpenStreetMap）</p>
               {placeResults.map(place => (
-                <button key={`${place.lat},${place.lon},${place.fullName}`} onClick={() => handleSelect(place)} className="w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-slate-50">
+                <button
+                  key={`${place.lat},${place.lon},${place.fullName}`}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => handleSelect(place)}
+                  className="w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-slate-50"
+                >
                   <MapPin size={16} className="text-teal-600 mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold text-slate-800 truncate">{place.name}</div>

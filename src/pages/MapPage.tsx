@@ -109,7 +109,7 @@ export function MapPage({ onToast }: MapPageProps) {
             {configOpen && <h2 className="text-sm font-bold text-slate-800 tracking-wide">深圳出发点</h2>}
             {configOpen && (
               <Tooltip content={mapTheme === 'light' ? '切换暗色底图' : '切换浅色底图'}>
-                <button onClick={() => setMapTheme(theme => theme === 'light' ? 'dark' : 'light')} className="btn-icon mr-1" style={{ width: 32, height: 32 }} aria-label={mapTheme === 'light' ? '切换暗色底图' : '切换浅色底图'}>
+                <button onClick={() => setMapTheme(theme => theme === 'light' ? 'dark' : 'light')} className="btn-icon mr-1" style={{ width: 32, height: 32 }} aria-label={mapTheme === 'light' ? '切换暗色底图' : '切换浅色底图'} title={mapTheme === 'light' ? '切换暗色地图' : '切换亮色地图'}>
                   {mapTheme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
                 </button>
               </Tooltip>
@@ -241,7 +241,7 @@ function ResultPanel({
   if (state.status === 'idle') return null;
 
   return (
-    <div className="absolute top-4 right-4 sm:right-6 z-[500] w-[300px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-thin">
+    <div className="absolute top-4 right-4 sm:right-6 z-[500] w-[320px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-thin">
       {state.status === 'computing' && (
         <div className="glass p-3.5 flex items-center gap-2.5">
           <Loader2 size={16} className="spinner text-teal-600 shrink-0" />

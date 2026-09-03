@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Polygon, Tooltip as LeafletTooltip, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Polygon, ScaleControl, Tooltip as LeafletTooltip, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { IsochroneRegion } from '@/shared/data/adapters/routingAdapter';
 import type { LatLng, Origin } from '../types';
@@ -47,8 +47,8 @@ function MetroStations({ reachableStopIds }: { reachableStopIds?: ReadonlySet<st
   if (zoom <= 10) return null;
 
   const radius = zoom <= 12 ? 3 : zoom <= 13 ? 4 : 5;
-  const weight = zoom <= 12 ? 0.8 : 1.2;
-  const baseOpacity = zoom <= 12 ? 0.7 : 0.9;
+  const weight = zoom <= 12 ? 0.6 : 1.2;
+  const baseOpacity = zoom <= 12 ? 0.82 : 0.92;
   const showTooltip = zoom >= 13;
 
   return (
@@ -56,7 +56,16 @@ function MetroStations({ reachableStopIds }: { reachableStopIds?: ReadonlySet<st
       {SHENZHEN_METRO_STOPS.map(stop => {
         const isInterchange = stop.lines.length > 1;
         const isReachable = reachableStopIds?.has(stop.stopId) ?? false;
+        const isMuted = reachableStopIds !== undefined && !isReachable;
         const lineColor = LINE_COLORS.get(stop.lines[0]) ?? '#0d9488';
+        const strokeColor = isMuted
+          ? '#64748b'
+          : isInterchange
+            ? '#0f766e'
+            : (zoom <= 12 ? 'rgba(255,255,255,0.5)' : '#ffffff');
+        const fillColor = isMuted
+          ? '#94a3b8'
+          : (isInterchange ? '#ffffff' : lineColor);
 
         return (
           <CircleMarker
@@ -64,10 +73,10 @@ function MetroStations({ reachableStopIds }: { reachableStopIds?: ReadonlySet<st
             center={[stop.lat, stop.lon]}
             radius={isReachable ? radius + 1.5 : (isInterchange ? radius + 1 : radius)}
             pathOptions={{
-              color: isInterchange ? '#0f766e' : (zoom <= 12 ? lineColor : '#ffffff'),
+              color: strokeColor,
               weight: isInterchange ? 1.8 : weight,
-              fillColor: isInterchange ? '#ffffff' : lineColor,
-              fillOpacity: isReachable ? 1 : (reachableStopIds ? baseOpacity * 0.6 : baseOpacity),
+              fillColor,
+              fillOpacity: isReachable ? 1 : (isMuted ? 0.3 : baseOpacity),
             }}
           >
             {showTooltip && (
@@ -238,7 +247,7 @@ export function BaseMap({ origin, regions, reachableStopIds, onMapClick, theme }
   const [tilesReady, setTilesReady] = useState(false);
 
   useEffect(() => {
-    const fallback = window.setTimeout(() => setTilesReady(true), 8_000);
+    const fallback = window.setTimeout(() => setTilesReady(true), 4_000);
     return () => window.clearTimeout(fallback);
   }, []);
 
@@ -250,6 +259,8 @@ export function BaseMap({ origin, regions, reachableStopIds, onMapClick, theme }
         style={{ width: '100%', height: '100%' }}
         zoomControl={false}
       >
+        <ZoomControl position="bottomright" />
+        <ScaleControl position="bottomleft" metric imperial={false} />
         <TileLayer
           key={theme}
           url={theme === 'dark' ? DARK_TILE_URL : OSM_TILE_URL}
