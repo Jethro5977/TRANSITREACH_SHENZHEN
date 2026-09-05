@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useBudgetLayers } from '@/features/reachability/hooks/useBudgetLayers';
 import { AlertTriangle, Clock, Crosshair, Footprints, Info, Loader2, MapPin, Maximize2, Minimize2, Moon, RotateCw, Sun, TrainFront, X } from 'lucide-react';
 import { Tooltip } from '@/shared/ui';
 import { BaseMap } from '@/features/reachability/components/BaseMap';
@@ -15,7 +16,7 @@ import {
 import { linesForStop } from '@/shared/data/adapters/gtfsAdapter';
 import { loadRailStops } from '@/shared/data/adapters/gtfsAdapter';
 import { useSearchParams } from 'react-router-dom';
-import { getDepartureProfile } from '@/shared/data/shenzhen/timetable';
+import { DEPARTURE_PROFILES, getDepartureProfile } from '@/shared/data/shenzhen/timetable';
 
 interface MapPageProps {
   onToast: (message: string, icon?: string) => void;
@@ -44,7 +45,64 @@ export function MapPage({ onToast }: MapPageProps) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [mapTheme, setMapTheme] = useState<'light' | 'dark'>('light');
   const [nearbyPlace, setNearbyPlace] = useState<PlaceResult | null>(initialPlace);
-  const reach = useReachability(initialLocation, initialPlace, onToast);
+  const [mode, setMode] = useState(searchParams.get('mode') === 'reverse' ? 'reverse' : 'forward');
+  const [overlayMode, setOverlayMode] = useState(searchParams.get('overlay') === '1');
+  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const captureRef = useRef<HTMLDivElement>(null);
+  const dragStart = useRef(0);
+  const didDrag = useRef(false);
+  const initialBudget = Number(searchParams.get('budget'));
+  const initialProfile = DEPARTURE_PROFILES.find(p => p.id === searchParams.get('departure'))?.id;
+  const reach = useReachability(initialLocation, initialPlace, onToast, [15, 30, 45, 60].includes(initialBudget) ? initialBudget : 30, initialProfile);
+  const layers = useBudgetLayers(reach.origin, reach.departureProfile, overlayMode);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    const origin = reach.origin;
+    if (origin?.stop) params.set('stop', origin.stop.stopId);
+    else if (origin) {
+      params.set('lat', String(origin.at.lat));
+      params.set('lon', String(origin.at.lon));
+      if (origin.place) params.set('name', origin.place.name);
+    }
+    params.set('budget', String(reach.timeBudget));
+    params.set('mode', mode);
+    params.set('departure', reach.departureProfile);
+    if (overlayMode) params.set('overlay', '1');
+    setSearchParams(params, { replace: true });
+  }, [reach.origin, reach.timeBudget, reach.departureProfile, mode, overlayMode, setSearchParams]);
+
+  const share = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      onToast('查询链接已复制，包含地点、方向和时间设置', '✓');
+    } catch { onToast('复制未成功，请复制浏览器地址栏链接', '!'); }
+  };
+  const exportImage = async () => {
+    if (!captureRef.current || exporting) return;
+    setExporting(true);
+    try {
+      const { toPng } = await import('html-to-image');
+      await document.fonts.ready;
+      const images = [...captureRef.current.querySelectorAll<HTMLImageElement>('.leaflet-tile')];
+      await Promise.race([
+        Promise.all(images.map(image => image.decode())),
+        new Promise((_, reject) => window.setTimeout(() => reject(new Error('底图加载超时')), 10000)),
+      ]);
+      const url = await toPng(captureRef.current, {
+        pixelRatio: 2, skipFonts: true, backgroundColor: '#f8fafc',
+        style: { position: 'relative', top: '0', left: '0', right: 'auto', bottom: 'auto', margin: '0' },
+        filter: node => !(node instanceof HTMLElement && node.dataset.exportExclude === 'true'),
+      });
+      const link = document.createElement('a');
+      link.download = `触达深圳-${mode}-${reach.timeBudget}分钟.png`;
+      link.href = url;
+      link.click();
+      onToast('通勤地图已保存为 PNG', '✓');
+    } catch { onToast('截图失败，请等待底图加载完成后重试', '!'); }
+    finally { setExporting(false); }
+  };
   const reachableStopIds = useMemo(() => (
     reach.state.status === 'ready'
       ? new Set(reach.state.result.reachableStations.map(({ stop }) => stop.stopId))
@@ -61,13 +119,13 @@ export function MapPage({ onToast }: MapPageProps) {
 
   const selectStop = (stop: RailStop) => {
     reach.selectStop(stop);
-    setSearchParams({ stop: stop.stopId }, { replace: true });
+    setNearbyPlace(null);
   };
 
   const selectPoint = (at: { lat: number; lon: number }) => {
     reach.selectPoint(at);
     setNearbyPlace(null);
-    setSearchParams({ lat: String(at.lat), lon: String(at.lon) }, { replace: true });
+    setMobileExpanded(false);
   };
 
   const selectSearchResult = (result: LocationSearchResult) => {
@@ -77,7 +135,6 @@ export function MapPage({ onToast }: MapPageProps) {
     }
     reach.selectPlace(result);
     setNearbyPlace(result);
-    setSearchParams({ lat: String(result.lat), lon: String(result.lon), name: result.name }, { replace: true });
   };
 
   const resultMetadata = reach.state.status === 'ready'
@@ -87,26 +144,41 @@ export function MapPage({ onToast }: MapPageProps) {
   return (
     // top-16 rather than pt-16: an absolutely positioned child resolves inset-0 against
     // the padding box, so padding here would let the map slide under the navbar.
-    <div className="fixed left-0 right-0 bottom-0 top-16 overflow-hidden">
-      <div className="absolute inset-0">
+    <div ref={captureRef} className="commute-map fixed left-0 right-0 bottom-0 top-16 overflow-hidden">
+      <div className="absolute inset-0 z-0">
         <BaseMap
           origin={reach.origin}
           regions={reach.state.status === 'ready' ? reach.state.result.regions : null}
           reachableStopIds={reachableStopIds}
+          stations={reach.state.status === 'ready' ? reach.state.result.reachableStations : undefined}
+          layers={layers.results}
           onMapClick={selectPoint}
           theme={mapTheme}
         />
       </div>
 
-      <ResultPanel state={reach.state} onRetry={reach.retry} />
+      <ResultPanel state={reach.state} onRetry={reach.retry} mode={mode} onExample={name => { const stop = loadRailStops().find(s => s.name === name); if (stop) selectStop(stop); }} />
+      <div className="map-actions absolute bottom-12 right-4 z-[600] flex gap-2" data-export-exclude="true">
+        <button className="btn-secondary text-xs px-3 py-2" onClick={share}>复制分享链接</button>
+        <button className="btn-secondary text-xs px-3 py-2" disabled={exporting || reach.state.status !== 'ready' || layers.pending} onClick={exportImage}>{exporting ? '正在保存…' : '保存截图'}</button>
+      </div>
+      {overlayMode && <div className="budget-legend absolute bottom-24 right-4 z-[600] glass p-3 text-xs" aria-live="polite">
+        {layers.pending ? '正在生成四档通勤圈…' : layers.error ? '叠加计算未完成，请关闭后重试' : '时间预算对比'}
+        <div className="flex gap-3 mt-2">{[15,30,45,60].map((n,i) => <span key={n}><i className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: ['#0f766e','#14b8a6','#5eead4','#99f6e4'][i] }} />{n}分</span>)}</div>
+      </div>}
 
       {/* The budget composition note makes the panel tall enough to overflow a short
           viewport, so it scrolls internally rather than running off the bottom — the
           note has to stay reachable to satisfy AC 1.2.3. */}
-      <div className={`map-config-panel absolute top-4 left-4 sm:left-6 z-[500] max-h-[calc(100%-2rem)] transition-all duration-300 ease-out ${configOpen ? 'w-[340px] max-w-[calc(100vw-2rem)]' : 'w-12'}`}>
+      <div className={`map-config-panel ${mobileExpanded ? 'mobile-expanded' : 'mobile-collapsed'} absolute top-4 left-4 sm:left-6 z-[500] max-h-[calc(100%-2rem)] transition-all duration-300 ease-out ${configOpen ? 'w-[340px] max-w-[calc(100vw-2rem)]' : 'w-12'}`}>
         <div className="map-config-card glass p-4 max-h-[calc(100vh-6rem)] overflow-y-auto overflow-x-hidden scrollbar-thin">
-          <div className="flex items-center justify-between mb-3">
-            {configOpen && <h2 className="text-sm font-bold text-slate-800 tracking-wide">深圳出发点</h2>}
+          <button className="drawer-handle sm:hidden w-full text-xs text-slate-500 pb-2" aria-expanded={mobileExpanded}
+            onClick={() => { if (!didDrag.current) setMobileExpanded(v => !v); setConfigOpen(true); }}
+            onPointerDown={e => { didDrag.current = false; dragStart.current = e.clientY; e.currentTarget.setPointerCapture(e.pointerId); }}
+            onPointerUp={e => { if (Math.abs(e.clientY - dragStart.current) > 20) { didDrag.current = true; setMobileExpanded(e.clientY < dragStart.current); setConfigOpen(true); } }}
+          >━ {mobileExpanded ? '收起配置' : '展开配置'}</button>
+          <div className="config-heading flex items-center justify-between mb-3">
+            {configOpen && <h2 className="text-sm font-bold text-slate-800 tracking-wide">{mode === 'reverse' ? '我的工作地点' : '深圳出发点'}</h2>}
             {configOpen && (
               <Tooltip content={mapTheme === 'light' ? '切换暗色底图' : '切换浅色底图'}>
                 <button onClick={() => setMapTheme(theme => theme === 'light' ? 'dark' : 'light')} className="btn-icon mr-1" style={{ width: 32, height: 32 }} aria-label={mapTheme === 'light' ? '切换暗色底图' : '切换浅色底图'} title={mapTheme === 'light' ? '切换暗色地图' : '切换亮色地图'}>
@@ -127,7 +199,14 @@ export function MapPage({ onToast }: MapPageProps) {
                 onSelect={selectSearchResult}
                 selected={reach.origin?.stop ?? null}
                 compact
+                placeholder={mode === 'reverse' ? '输入工作地点或目的地' : '搜索地点、小区或地铁站'}
               />
+
+              <div className="mobile-budget sm:hidden"><TimeBudgetSelector value={reach.timeBudget} onChange={reach.changeTimeBudget} /></div>
+              <div className="config-details space-y-4">
+              <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs" role="group" aria-label="通勤方向">
+                {(['forward', 'reverse'] as const).map(value => <button key={value} aria-pressed={mode === value} className={`flex-1 py-2 ${mode === value ? 'bg-teal-600 text-white' : 'text-slate-600'}`} onClick={() => setMode(value)}>{value === 'forward' ? '📍 从这里出发' : '🏢 到达这里'}</button>)}
+              </div>
 
               <div className="flex items-center gap-2">
                 {/* AC 1.1.4 — the permission is requested on this tap and nowhere else. */}
@@ -140,7 +219,7 @@ export function MapPage({ onToast }: MapPageProps) {
                 </button>
                 {reach.origin && (
                   <button
-                    onClick={reach.clearOrigin}
+                    onClick={() => { reach.clearOrigin(); setNearbyPlace(null); }}
                     className="btn-secondary inline-flex items-center gap-1.5 text-xs py-2 px-3"
                   >
                     <X size={14} />
@@ -159,10 +238,11 @@ export function MapPage({ onToast }: MapPageProps) {
 
               {nearbyPlace && <NearbyStopsPanel place={nearbyPlace} stops={nearbyStops} onSelectStop={selectStop} />}
 
-              <div>
+              <div className="desktop-budget hidden sm:block">
                 <label className="text-xs font-semibold text-slate-500 mb-1.5 block">时间预算</label>
                 <TimeBudgetSelector value={reach.timeBudget} onChange={reach.changeTimeBudget} />
               </div>
+              <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={overlayMode} onChange={e => setOverlayMode(e.target.checked)} />叠加显示 15 / 30 / 45 / 60 分钟</label>
 
               <div>
                 <label className="text-xs font-semibold text-slate-500 mb-1.5 block">出发时间</label>
@@ -173,6 +253,7 @@ export function MapPage({ onToast }: MapPageProps) {
                 <Info size={14} />
                 数据来源与模型说明
               </button>
+              </div>
             </div>
           )}
         </div>
@@ -231,17 +312,21 @@ function OriginReadout({ origin }: { origin: NonNullable<ReturnType<typeof useRe
 function ResultPanel({
   state,
   onRetry,
+  mode,
+  onExample,
 }: {
   state: ReachabilityState;
   onRetry: () => void;
+  mode: string;
+  onExample: (name: string) => void;
 }) {
   const [dismissed, setDismissed] = useState<number | null>(null);
   const [expandedStations, setExpandedStations] = useState(false);
 
-  if (state.status === 'idle') return null;
+  if (state.status === 'idle') return <div className="result-panel absolute top-4 right-4 z-[500] w-[320px] max-w-[calc(100vw-2rem)] glass p-4"><h2 className="font-bold text-sm">📍 {mode === 'reverse' ? '选择工作地点' : '选择起点'}</h2><p className="text-xs text-slate-500 my-3">搜索地点或地铁站，或点击地图开始分析通勤范围。</p><div className="flex gap-2">{['福田','深圳北','车公庙'].map(name => <button className="chip chip-unselected" key={name} onClick={() => onExample(name)}>{name}</button>)}</div></div>;
 
   return (
-    <div className="absolute top-4 right-4 sm:right-6 z-[500] w-[320px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-thin">
+    <div className="result-panel absolute top-4 right-4 sm:right-6 z-[500] w-[320px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-thin">
       {state.status === 'computing' && (
         <div className="glass p-3.5 flex items-center gap-2.5">
           <Loader2 size={16} className="spinner text-teal-600 shrink-0" />
@@ -298,7 +383,7 @@ function ResultPanel({
           {/* AC 1.2.2 — this label comes from the state the area was computed with, never
               from the selector, so the two cannot disagree. */}
           <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-            {state.budgetMinutes} 分钟本地模型可达范围
+            {state.budgetMinutes} 分钟{mode === 'reverse' ? '通勤圈 · 居住选区参考' : '可达范围'}
           </div>
           <div className="text-2xl font-bold text-slate-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {state.result.areaKm2.toFixed(1)}
@@ -309,8 +394,8 @@ function ResultPanel({
               ? '1 个融合后的不规则区域'
               : `${state.result.regions.length} 个不连续区域块`}
           </div>
-
           {/* AC 1.3.1 — the boundary is modelled, not a surveyed line. */}
+          <p className="text-[11px] text-amber-700 mt-2">启发式模型近似值 · Demo{mode === 'reverse' ? '；反向模式沿用出发估算，实际通勤需核验。' : ''}</p>
           <p className="text-[11px] text-slate-400 leading-snug mt-2 pt-2 border-t border-slate-200/70">
             重叠站点包络会避开 OSM 水域、快速路、铁路与封闭区，并对山峰方向作近似衰减；仍未使用完整步行道路图，并非精确导航结果。
           </p>
@@ -318,7 +403,7 @@ function ResultPanel({
           <div className="mt-3 pt-3 border-t border-slate-200/70">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
               <MapPin size={13} className="text-teal-700" />
-              可达地铁站（{state.result.reachableStations.length} / 266）
+              {mode === 'reverse' ? '可通勤地铁站' : '可达地铁站'}（{state.result.reachableStations.length} / 266）
             </div>
             <div className="mt-2 space-y-1.5">
               {state.result.reachableStations.slice(0, expandedStations ? undefined : 6).map(station => (

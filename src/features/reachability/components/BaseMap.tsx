@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Polygon, ScaleControl, Tooltip as LeafletTooltip, useMap, useMapEvents, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { IsochroneRegion } from '@/shared/data/adapters/routingAdapter';
+import type { IsochroneRegion, IsochroneResult, ReachableStation } from '@/shared/data/adapters/routingAdapter';
 import type { LatLng, Origin } from '../types';
 import { NETWORK_CENTRE } from '../reachabilityService';
 import { SHENZHEN_METRO_LINES, SHENZHEN_METRO_STOPS } from '@/shared/data/shenzhen/metro';
@@ -38,7 +38,7 @@ const AREA_COLOR = '#0d9488';
 const LINE_COLORS = new Map(SHENZHEN_METRO_LINES.map(line => [line.routeId, line.color]));
 
 /** Fixed rail stations reveal progressively; they are not random POIs to be clustered. */
-function MetroStations({ reachableStopIds }: { reachableStopIds?: ReadonlySet<string> }) {
+function MetroStations({ reachableStopIds, stations }: { reachableStopIds?: ReadonlySet<string>; stations?: ReachableStation[] }) {
   const map = useMap();
   const [zoom, setZoom] = useState(map.getZoom());
   useMapEvents({ zoomend: event => setZoom(event.target.getZoom()) });
@@ -49,12 +49,13 @@ function MetroStations({ reachableStopIds }: { reachableStopIds?: ReadonlySet<st
   const radius = zoom <= 12 ? 3 : zoom <= 13 ? 4 : 5;
   const weight = zoom <= 12 ? 0.6 : 1.2;
   const baseOpacity = zoom <= 12 ? 0.82 : 0.92;
-  const showTooltip = zoom >= 13;
+  const showTooltip = zoom >= 11;
 
   return (
     <>
       {SHENZHEN_METRO_STOPS.map(stop => {
         const isInterchange = stop.lines.length > 1;
+        const journey = stations?.find(station => station.stop.stopId === stop.stopId);
         const isReachable = reachableStopIds?.has(stop.stopId) ?? false;
         const isMuted = reachableStopIds !== undefined && !isReachable;
         const lineColor = LINE_COLORS.get(stop.lines[0]) ?? '#0d9488';
@@ -82,7 +83,9 @@ function MetroStations({ reachableStopIds }: { reachableStopIds?: ReadonlySet<st
             {showTooltip && (
               <LeafletTooltip direction="top" offset={[0, -5]}>
                 <span className="font-semibold">{stop.name}</span>
-                <span className="text-slate-500"> · {stop.lines.join('/')}号线</span>
+                <div className="flex gap-2 my-1">{stop.lines.map(line => <span key={line}><i className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: LINE_COLORS.get(line) }} />{line}号线</span>)}</div>
+                {isInterchange && <div>换乘站</div>}
+                {stations && <div>{journey ? `✓ 预算内 · 约 ${Math.ceil(journey.travelMinutes)} 分钟 · ${journey.transfers ? '1 次换乘' : '直达'}` : '当前预算外'}</div>}
               </LeafletTooltip>
             )}
           </CircleMarker>
@@ -98,6 +101,8 @@ interface BaseMapProps {
   regions: IsochroneRegion[] | null;
   /** Station ids computed within the current time budget; omitted before a calculation. */
   reachableStopIds?: ReadonlySet<string>;
+  stations?: ReachableStation[];
+  layers?: IsochroneResult[];
   onMapClick: (at: LatLng) => void;
   theme: 'light' | 'dark';
 }
@@ -217,23 +222,26 @@ function OriginPin({ at }: { at: LatLng }) {
  * them that way. Holes are passed through as inner rings so enclosed unreachable ground
  * is not painted as reachable.
  */
-function ReachabilityLayer({ regions }: { regions: IsochroneRegion[] }) {
+function ReachabilityLayer({ regions, budget }: { regions: IsochroneRegion[]; budget?: number }) {
+  const colors: Record<number, string> = { 15: '#0f766e', 30: '#14b8a6', 45: '#5eead4', 60: '#99f6e4' };
+  const opacities: Record<number, number> = { 15: 0.35, 30: 0.25, 45: 0.15, 60: 0.08 };
+  const color = budget ? colors[budget] : AREA_COLOR;
   return (
     <>
       {regions.map((region, i) => (
         <Polygon
           key={i}
+          className={budget ? `reach-area budget-layer-${budget}` : 'reach-area reach-area-enter'}
           // GeoJSON is [lon, lat]; Leaflet wants [lat, lon].
           positions={[region.outer, ...region.holes].map(ring =>
             ring.map(([lon, lat]) => [lat, lon] as [number, number]),
           )}
           pathOptions={{
-            className: 'reach-area reach-area-enter',
-            color: AREA_COLOR,
+            color,
             weight: 2,
             opacity: 0.6,
-            fillColor: AREA_COLOR,
-            fillOpacity: FILL_OPACITY,
+            fillColor: color,
+            fillOpacity: budget ? opacities[budget] : FILL_OPACITY,
             dashArray: '6 3',
           }}
           interactive={false}
@@ -243,7 +251,7 @@ function ReachabilityLayer({ regions }: { regions: IsochroneRegion[] }) {
   );
 }
 
-export function BaseMap({ origin, regions, reachableStopIds, onMapClick, theme }: BaseMapProps) {
+export function BaseMap({ origin, regions, reachableStopIds, stations, layers = [], onMapClick, theme }: BaseMapProps) {
   const [tilesReady, setTilesReady] = useState(false);
 
   useEffect(() => {
@@ -266,16 +274,17 @@ export function BaseMap({ origin, regions, reachableStopIds, onMapClick, theme }
           url={theme === 'dark' ? DARK_TILE_URL : OSM_TILE_URL}
           attribution={theme === 'dark' ? DARK_ATTRIBUTION : OSM_ATTRIBUTION}
           maxZoom={19}
+          crossOrigin="anonymous"
           eventHandlers={{ load: () => setTilesReady(true) }}
         />
         {/* Must precede ViewController so the container size is correct before the view is set. */}
         <ResizeHandler />
         <ClickHandler onMapClick={onMapClick} />
         <ViewController origin={origin} />
-        <ReachabilityView regions={regions} />
-        <MetroStations reachableStopIds={reachableStopIds} />
+        <ReachabilityView regions={layers.length ? layers[0].regions : regions} />
         {/* The area is drawn first so the origin pin sits above the fill (AC 1.3.1). */}
-        {regions && <ReachabilityLayer regions={regions} />}
+        {layers.length ? layers.map(layer => <ReachabilityLayer key={layer.budgetMinutes} regions={layer.regions} budget={layer.budgetMinutes} />) : regions && <ReachabilityLayer regions={regions} />}
+        <MetroStations reachableStopIds={reachableStopIds} stations={stations} />
         {origin && <OriginPin at={origin.at} />}
       </MapContainer>
       {!tilesReady && (

@@ -595,6 +595,16 @@
 }
 
 @media (max-width: 639px) {
+  .commute-map .result-panel { top: 12px; right: 12px; width: 250px; max-height: 32vh; }
+  .commute-map .map-actions { bottom: 158px; right: 12px; }
+  .commute-map .budget-legend { bottom: 230px; right: 12px; }
+  .commute-map .leaflet-bottom { bottom: 155px; }
+  .commute-map .config-heading { display: none; }
+  .commute-map .drawer-handle { touch-action: none; }
+  .commute-map .mobile-collapsed .config-details { display: none; }
+  .commute-map .mobile-collapsed .map-config-card { overflow: visible; }
+  .commute-map .mobile-collapsed .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 8px; }
+  .commute-map .map-config-panel { z-index: 750; }
   .map-config-panel {
     top: auto;
     right: 0.75rem;

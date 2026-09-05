@@ -23,6 +23,7 @@ interface LocationSearchProps {
   onSelect: (result: LocationSearchResult) => void;
   selected?: RailStop | null;
   compact?: boolean;
+  placeholder?: string;
 }
 
 // A session cache prevents repeated user queries from hitting the shared public service.
@@ -36,7 +37,7 @@ let lastNominatimRequestAt = 0;
  * a network request: the user must choose “搜索地点”. Requests are application-wide
  * throttled to one per second and cached for the browser session.
  */
-export function LocationSearch({ onSelect, selected, compact = false }: LocationSearchProps) {
+export function LocationSearch({ onSelect, selected, compact = false, placeholder = PLACEHOLDER }: LocationSearchProps) {
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
   const [highlightedIdx, setHighlightedIdx] = useState(-1);
@@ -153,7 +154,7 @@ export function LocationSearch({ onSelect, selected, compact = false }: Location
               void searchPlaces();
             }
           }}
-          placeholder={PLACEHOLDER}
+          placeholder={placeholder}
           aria-label={PLACEHOLDER}
           className="flex-1 bg-transparent outline-none text-sm font-medium text-slate-700 placeholder:text-slate-400"
         />

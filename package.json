@@ -1,7 +1,7 @@
 {
   "name": "transitreach-shenzhen",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "深圳公共交通时间可达性前端演示",
   "type": "module",
   "scripts": {
@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@turf/turf": "^7.4.0",
+    "html-to-image": "^1.11.13",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.446.0",
     "polygon-clipping": "^0.15.7",

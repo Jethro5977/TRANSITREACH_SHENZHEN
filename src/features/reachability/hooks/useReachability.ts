@@ -38,6 +38,8 @@ export function useReachability(
   initialStop: RailStop | null,
   initialPlace: PlaceResult | null,
   onToast: (message: string, icon?: string) => void,
+  initialBudget = DEFAULT_TIME_BUDGET,
+  initialProfile: DepartureProfileId = DEFAULT_DEPARTURE_PROFILE,
 ) {
   const [origin, setOrigin] = useState<Origin | null>(
     initialStop
@@ -46,8 +48,8 @@ export function useReachability(
         ? { at: initialPlace, source: 'place', place: initialPlace }
         : null,
   );
-  const [timeBudget, setTimeBudget] = useState(DEFAULT_TIME_BUDGET);
-  const [departureProfile, setDepartureProfile] = useState<DepartureProfileId>(DEFAULT_DEPARTURE_PROFILE);
+  const [timeBudget, setTimeBudget] = useState(initialBudget);
+  const [departureProfile, setDepartureProfile] = useState<DepartureProfileId>(initialProfile);
   const [state, setState] = useState<ReachabilityState>({ status: 'idle' });
 
   // Guards against a superseded result ever reaching the screen. Every run takes a
