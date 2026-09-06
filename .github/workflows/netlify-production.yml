@@ -1,9 +1,7 @@
 name: Deploy TransitReach Shenzhen
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions: {}
 

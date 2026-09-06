@@ -595,6 +595,11 @@
 }
 
 @media (max-width: 639px) {
+  .commute-map .leaflet-control-zoom { position: fixed; top: 80px; left: 12px; margin: 0; }
+  .commute-map.drawer-expanded .result-panel { max-height: 24vh; }
+  .commute-map.drawer-expanded .map-actions,
+  .commute-map.drawer-expanded .budget-legend { display: none; }
+  .commute-map.drawer-expanded .leaflet-bottom { bottom: calc(min(58vh, 520px) + 8px); }
   .commute-map .result-panel { top: 12px; right: 12px; width: 250px; max-height: 32vh; }
   .commute-map .map-actions { bottom: 158px; right: 12px; }
   .commute-map .budget-legend { bottom: 230px; right: 12px; }
@@ -621,3 +626,8 @@
     box-shadow: 0 -12px 34px rgba(11, 36, 59, 0.14);
   }
 }
+
+.app-dialog { width: min(28rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); margin: auto; }
+.app-dialog::backdrop { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); }
+button:focus-visible, a:focus-visible { outline: 3px solid #0d9488; outline-offset: 3px; }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Loader2, MapPin, Search, Train } from 'lucide-react';
 import { loadRailStops, linesForStop } from '@/shared/data/adapters/gtfsAdapter';
 import type { PlaceResult, RailStop } from '../types';
@@ -24,6 +24,7 @@ interface LocationSearchProps {
   selected?: RailStop | null;
   compact?: boolean;
   placeholder?: string;
+  initialQuery?: string;
 }
 
 // A session cache prevents repeated user queries from hitting the shared public service.
@@ -37,18 +38,20 @@ let lastNominatimRequestAt = 0;
  * a network request: the user must choose “搜索地点”. Requests are application-wide
  * throttled to one per second and cached for the browser session.
  */
-export function LocationSearch({ onSelect, selected, compact = false, placeholder = PLACEHOLDER }: LocationSearchProps) {
-  const [query, setQuery] = useState('');
+export function LocationSearch({ onSelect, selected, compact = false, placeholder = PLACEHOLDER, initialQuery = '' }: LocationSearchProps) {
+  const [query, setQuery] = useState(initialQuery);
   const [focused, setFocused] = useState(false);
   const [highlightedIdx, setHighlightedIdx] = useState(-1);
   const [placeResults, setPlaceResults] = useState<PlaceResult[]>([]);
   const [placeState, setPlaceState] = useState<'idle' | 'searching' | 'empty' | 'error'>('idle');
   const requestController = useRef<AbortController | null>(null);
+  useEffect(() => () => requestController.current?.abort(), []);
 
   const stops = useMemo(() => loadRailStops(), []);
   const stationResults = useMemo(() => searchStops(query, stops), [query, stops]);
   const searching = query.trim().length >= MIN_QUERY_LENGTH;
   const canSearchPlaces = searching && stationResults.length === 0;
+  const results: LocationSearchResult[] = stationResults.length ? stationResults : placeResults;
 
   const resetPlaceSearch = () => {
     requestController.current?.abort();
@@ -57,6 +60,7 @@ export function LocationSearch({ onSelect, selected, compact = false, placeholde
   };
 
   const handleSelect = (result: LocationSearchResult) => {
+    requestController.current?.abort();
     onSelect(result);
     setQuery(result.name);
     setFocused(false);
@@ -127,7 +131,9 @@ export function LocationSearch({ onSelect, selected, compact = false, placeholde
   };
 
   return (
-    <div className="relative">
+    <div className="relative" onFocus={() => setFocused(true)} onBlur={event => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
+    }}>
       <div className={`glass-input flex items-center gap-2 px-3.5 py-3 ${focused ? 'ring-2 ring-teal-500/20' : ''} ${compact ? 'text-sm' : ''}`}>
         <Search size={compact ? 16 : 18} className={focused ? 'text-teal-600' : 'text-slate-400'} style={{ transition: 'color 200ms ease-out' }} />
         <input
@@ -139,24 +145,28 @@ export function LocationSearch({ onSelect, selected, compact = false, placeholde
             resetPlaceSearch();
           }}
           onFocus={() => setFocused(true)}
-          onBlur={() => window.setTimeout(() => setFocused(false), 150)}
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown') {
               event.preventDefault();
-              setHighlightedIdx(previous => Math.min(previous + 1, stationResults.length - 1));
+              setFocused(true);
+              setHighlightedIdx(previous => Math.min(previous + 1, results.length - 1));
             } else if (event.key === 'ArrowUp') {
               event.preventDefault();
               setHighlightedIdx(previous => Math.max(previous - 1, 0));
             } else if (event.key === 'Enter' && highlightedIdx >= 0) {
-              handleSelect(stationResults[highlightedIdx]);
+              event.preventDefault();
+              if (results[highlightedIdx]) handleSelect(results[highlightedIdx]);
             } else if (event.key === 'Enter' && canSearchPlaces) {
               event.preventDefault();
               void searchPlaces();
+            } else if (event.key === 'Escape') {
+              setFocused(false);
+              setHighlightedIdx(-1);
             }
           }}
           placeholder={placeholder}
-          aria-label={PLACEHOLDER}
-          className="flex-1 bg-transparent outline-none text-sm font-medium text-slate-700 placeholder:text-slate-400"
+          aria-label={placeholder}
+          className="min-w-0 flex-1 bg-transparent outline-none text-sm font-medium text-slate-700 placeholder:text-slate-400"
         />
         {selected && <MapPin size={16} className="text-teal-600" />}
       </div>
@@ -189,12 +199,13 @@ export function LocationSearch({ onSelect, selected, compact = false, placeholde
           {canSearchPlaces && (
             <div>
               <p className="px-3 pt-1.5 pb-1 text-[10px] font-bold tracking-wide text-slate-500">地点（OpenStreetMap）</p>
-              {placeResults.map(place => (
+              {placeResults.map((place, idx) => (
                 <button
                   key={`${place.lat},${place.lon},${place.fullName}`}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => handleSelect(place)}
-                  className="w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-slate-50"
+                  onMouseEnter={() => setHighlightedIdx(idx)}
+                  className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left ${highlightedIdx === idx ? 'bg-teal-50' : 'hover:bg-slate-50'}`}
                 >
                   <MapPin size={16} className="text-teal-600 mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">

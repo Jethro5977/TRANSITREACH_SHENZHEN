@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 interface ModalProps {
   open: boolean;
@@ -7,16 +7,23 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, children }: ModalProps) {
-  if (!open) return null;
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+    return () => { if (dialog.open) dialog.close(); };
+  }, [open]);
+
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm fade-in" onClick={onClose} />
-      <div
-        className="relative glass-strong p-6 max-w-md w-full fade-slide-up"
-        style={{ animation: 'pageEnter 300ms ease-out, fadeIn 300ms ease-out' }}
-      >
-        {children}
-      </div>
-    </div>
+    <dialog ref={dialogRef} className="app-dialog glass-strong p-6 text-slate-700"
+      aria-label="数据来源与模型说明" onCancel={onClose}
+      onClick={event => { if (event.target === event.currentTarget) {
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
+      } }}>
+      {children}
+    </dialog>
   );
 }

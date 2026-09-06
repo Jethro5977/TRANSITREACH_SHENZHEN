@@ -191,6 +191,7 @@ function OriginPin({ at }: { at: LatLng }) {
   return (
     <>
       <CircleMarker
+        className="origin-marker"
         center={[at.lat, at.lon]}
         radius={13}
         // AC 1.3.1 — the marker must sit above the fill. Leaflet stacks vectors in the
@@ -199,14 +200,15 @@ function OriginPin({ at }: { at: LatLng }) {
         // z-index 600 against overlayPane's 400, which makes the ordering independent of
         // mount order. Do not move these back to the default pane.
         pane="markerPane"
-        pathOptions={{ className: 'origin-marker', color: '#0d9488', weight: 2, fillColor: '#0d9488', fillOpacity: 0.18 }}
+        pathOptions={{ color: '#0d9488', weight: 2, fillColor: '#0d9488', fillOpacity: 0.18 }}
         interactive={false}
       />
       <CircleMarker
+        className="origin-marker"
         center={[at.lat, at.lon]}
         radius={6}
         pane="markerPane"
-        pathOptions={{ className: 'origin-marker', color: '#ffffff', weight: 2.5, fillColor: '#0d9488', fillOpacity: 1 }}
+        pathOptions={{ color: '#ffffff', weight: 2.5, fillColor: '#0d9488', fillOpacity: 1 }}
         interactive={false}
       />
     </>

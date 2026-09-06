@@ -112,7 +112,7 @@ export function LandingPage() {
           </div>
           <section className="mt-10 border-t border-slate-200/80 pt-10" aria-labelledby="capabilities-title">
             <h2 id="capabilities-title" className="text-2xl font-extrabold text-slate-900">这个工具能做什么</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">用用户语言说明当前可用能力与边界，帮助你正确理解地图上的结果。</p>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">从一个地点出发，对比不同时间预算下的覆盖范围，了解地铁与步行如何连接这座城市。</p>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <CapabilityCard icon={Check} title="估算地铁可达范围" text="选择起点和时间预算，查看步行、地铁与一次换乘组合下的大致可达区域。" status="available" />
               <CapabilityCard icon={Check} title="对比不同时间预算" text="快速切换 15、30、45、60 分钟，直观感受时间预算对可达范围的影响。" status="available" />

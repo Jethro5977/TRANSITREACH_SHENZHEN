@@ -12,6 +12,7 @@ import { useReachability, type ReachabilityState } from '@/features/reachability
 import { isPlaceResult, type PlaceResult, type RailStop } from '@/features/reachability/types';
 import {
   formatCoord,
+  isInStudyArea,
 } from '@/features/reachability/reachabilityService';
 import { linesForStop } from '@/shared/data/adapters/gtfsAdapter';
 import { loadRailStops } from '@/shared/data/adapters/gtfsAdapter';
@@ -23,9 +24,9 @@ interface MapPageProps {
 }
 
 function parsePlaceSearchParams(searchParams: URLSearchParams): PlaceResult | null {
-  const lat = Number.parseFloat(searchParams.get('lat') ?? '');
-  const lon = Number.parseFloat(searchParams.get('lon') ?? '');
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const lat = Number(searchParams.get('lat'));
+  const lon = Number(searchParams.get('lon'));
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || !isInStudyArea({ lat, lon })) return null;
   const name = searchParams.get('name')?.trim() || '地图选点';
   return { lat, lon, name, fullName: name, type: 'place' };
 }
@@ -55,7 +56,7 @@ export function MapPage({ onToast }: MapPageProps) {
   const initialBudget = Number(searchParams.get('budget'));
   const initialProfile = DEPARTURE_PROFILES.find(p => p.id === searchParams.get('departure'))?.id;
   const reach = useReachability(initialLocation, initialPlace, onToast, [15, 30, 45, 60].includes(initialBudget) ? initialBudget : 30, initialProfile);
-  const layers = useBudgetLayers(reach.origin, reach.departureProfile, overlayMode);
+  const layers = useBudgetLayers(reach.origin, reach.departureProfile, overlayMode && reach.state.status === 'ready');
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -144,7 +145,7 @@ export function MapPage({ onToast }: MapPageProps) {
   return (
     // top-16 rather than pt-16: an absolutely positioned child resolves inset-0 against
     // the padding box, so padding here would let the map slide under the navbar.
-    <div ref={captureRef} className="commute-map fixed left-0 right-0 bottom-0 top-16 overflow-hidden">
+    <div ref={captureRef} className={`commute-map ${mobileExpanded ? 'drawer-expanded' : ''} fixed left-0 right-0 bottom-0 top-16 overflow-hidden`}>
       <div className="absolute inset-0 z-0">
         <BaseMap
           origin={reach.origin}
@@ -187,7 +188,7 @@ export function MapPage({ onToast }: MapPageProps) {
               </Tooltip>
             )}
             <Tooltip content={configOpen ? '收起' : '展开'}>
-              <button onClick={() => setConfigOpen(prev => !prev)} className="btn-icon ml-auto" style={{ width: 32, height: 32 }}>
+              <button aria-label={configOpen ? '收起配置面板' : '展开配置面板'} onClick={() => setConfigOpen(prev => !prev)} className="btn-icon ml-auto" style={{ width: 32, height: 32 }}>
                 {configOpen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
             </Tooltip>
@@ -196,6 +197,8 @@ export function MapPage({ onToast }: MapPageProps) {
           {configOpen && (
             <div className="space-y-4 fade-in">
               <LocationSearch
+                key={reach.origin ? `${reach.origin.at.lat},${reach.origin.at.lon}` : 'empty'}
+                initialQuery={reach.origin?.stop?.name ?? reach.origin?.place?.name ?? ''}
                 onSelect={selectSearchResult}
                 selected={reach.origin?.stop ?? null}
                 compact

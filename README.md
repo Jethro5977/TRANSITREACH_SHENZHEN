@@ -2,13 +2,13 @@
 
 一个用于探索深圳步行与地铁组合可达范围的公开测试版 Web 工具。
 
-在线访问：[transitreach-sz.netlify.app](https://transitreach-sz.netlify.app/)
+在线访问：[transitreach-shenzhen-1.onrender.com](https://transitreach-shenzhen-1.onrender.com/)
 
-`main` 分支已连接 Netlify；推送更新后会自动执行 `npm run build` 并发布 `dist/`。
+生产站点托管在 Render Static Site，连接本仓库 `main` 分支，发布目录为 `dist/`。构建与验收步骤见 [Render 运维记录](docs/RENDER_RELEASE.md)。旧 Netlify workflow 保留为手动触发，避免每次推送重复消耗旧平台配额。
 
 ![TransitReach Shenzhen](https://img.shields.io/badge/City-Shenzhen-0d9488?style=flat-square)
 ![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square)
-![Vite](https://img.shields.io/badge/Vite-5-646cff?style=flat-square)
+![Vite](https://img.shields.io/badge/Vite-7-646cff?style=flat-square)
 
 ## 当前能力
 
@@ -23,7 +23,7 @@
 - 通过独立 Info 弹窗公开展示数据来源、参数、覆盖范围和未建模限制
 - 支持 `/map`、`/methodology` 直达链接、中文 404 与 PWA 安装元数据
 - 地图页按需加载；站点按线路颜色显示，并在低缩放级别自动缩小以减少重叠
-- 低缩放级别将 266 个站点聚合为可点击数量标记；地图支持浅色 OSM 与可选 CARTO 暗色底图
+- 站点按缩放级别逐步显示；地图支持浅色 OSM 与可选 CARTO 暗色底图
 - 首页使用零依赖的数字跳动、CSS mesh 背景与轻量微倾斜；移动端地图配置自动切换为底部面板
 - 地图瓦片加载 skeleton、计算状态与模型边界说明
 
